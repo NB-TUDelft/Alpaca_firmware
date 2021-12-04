@@ -1,6 +1,6 @@
 MicroPython for NB2211 *Electronic Instrumentation*
 ===========
-[Find the build here](https://github.com/twhoekstra/nb2211-micropython/tree/master/ports/rp2/build-PICO/firmware.uf2)
+[Find the build here](https://github.com/twhoekstra/nb2211-micropython/tree/master/Alpaca-build/Alpaca-firmware.uf2)
 
 Adapted for the course by: Tijmen de Wolf and Thijn Hoekstra
 
