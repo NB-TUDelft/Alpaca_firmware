@@ -2,7 +2,7 @@
     By: Thijmen de Wolf & Thijn Hoekstra
 """
 
-version = "0.5" # Module version so students can retrieve their version for debugging
+version = "0.6" # Module version so students can retrieve their version for debugging
 
 # This module will be imported on both machines running CPython and MicroPython. If IS_PICO is true, 
 # then the module has been imported on a device running MicroPython, i.e. the Raspberry Pi Pico
