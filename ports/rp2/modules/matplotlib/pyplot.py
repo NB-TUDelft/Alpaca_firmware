@@ -39,7 +39,7 @@ def subplot(*args, **kwargs):
     """Add an Axes to the current figure or retrieve an existing Axes."""
     raise NotImplementedError('matplotlib.pyplot.subplot is not implemented yet for ALPACA.')
 
-
+# Plotting should happen via pyplot
 def subplots(nrows=1, ncols=1, *, sharex=False, sharey=False, squeeze=True,
              subplot_kw=None, gridspec_kw=None, **fig_kw):
     """
@@ -71,7 +71,7 @@ def xlim(*args, **kwargs):
     Calling this function with arguments is the pyplot equivalent of calling
     `~.Axes.set_xlim` on the current axes. All arguments are passed though.
     """
-    return __ATTRIBUTE_PREFIX + 'xlim'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'
+    print(__ATTRIBUTE_PREFIX + 'xlim'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
 
 def ylim(*args, **kwargs):
     """
@@ -96,7 +96,7 @@ def ylim(*args, **kwargs):
     Calling this function with arguments is the pyplot equivalent of calling
     `~.Axes.set_ylim` on the current axes. All arguments are passed though.
     """
-    return __ATTRIBUTE_PREFIX + 'ylim'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'
+    print(__ATTRIBUTE_PREFIX + 'ylim'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
 
 def xticks(ticks=None, labels=None, **kwargs):
     """
@@ -130,7 +130,7 @@ def xticks(ticks=None, labels=None, **kwargs):
     kwargs['labels'] = labels
     args = ()
 
-    return __ATTRIBUTE_PREFIX + 'xticks'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'
+    print(__ATTRIBUTE_PREFIX + 'xticks'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
 
 def yticks(ticks=None, labels=None, **kwargs):
     """
@@ -163,7 +163,7 @@ def yticks(ticks=None, labels=None, **kwargs):
     kwargs['labels'] = labels
     args = ()
 
-    return __ATTRIBUTE_PREFIX + 'yticks'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'
+    print(__ATTRIBUTE_PREFIX + 'yticks'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
 
 
 def polar(*args, **kwargs):
@@ -185,7 +185,7 @@ def hlines(y, xmin, xmax, colors=None, linestyles='solid', label='', data=None, 
 
     args = (y, xmin, xmax)
 
-    return __ATTRIBUTE_PREFIX + 'yticks'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'
+    print(__ATTRIBUTE_PREFIX + 'yticks'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
 
 def legend(*args, **kwargs):
     return __ATTRIBUTE_PREFIX + 'yticks'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'
@@ -227,7 +227,7 @@ def vlines(
     kwargs['label'] = label
     kwargs['data'] = data
 
-    return __ATTRIBUTE_PREFIX + 'vlines'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'  
+    print(__ATTRIBUTE_PREFIX + 'vlines'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
 
 def title(label, fontdict=None, loc=None, pad=None, *, y=None, **kwargs):
     args = (label)
@@ -237,7 +237,7 @@ def title(label, fontdict=None, loc=None, pad=None, *, y=None, **kwargs):
     kwargs['pad'] = pad
     kwargs['y'] = y
 
-    return __ATTRIBUTE_PREFIX + 'title'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'  
+    print(__ATTRIBUTE_PREFIX + 'title'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
 
 
 def xlabel(xlabel, fontdict=None, labelpad=None, *, loc=None, **kwargs):
@@ -247,7 +247,7 @@ def xlabel(xlabel, fontdict=None, labelpad=None, *, loc=None, **kwargs):
     kwargs['labelpad'] = labelpad
     kwargs['loc'] = loc
 
-    return __ATTRIBUTE_PREFIX + 'xlabel'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'  
+    print(__ATTRIBUTE_PREFIX + 'xlabel'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
 
 def ylabel(ylabel, fontdict=None, labelpad=None, *, loc=None, **kwargs):
     args = (ylabel)
@@ -256,14 +256,14 @@ def ylabel(ylabel, fontdict=None, labelpad=None, *, loc=None, **kwargs):
     kwargs['labelpad'] = labelpad
     kwargs['loc'] = loc
 
-    return __ATTRIBUTE_PREFIX + 'ylabel'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'  
+    print(__ATTRIBUTE_PREFIX + 'ylabel'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
 
 def xscale(value, **kwargs):
     args = (value)
 
-    return __ATTRIBUTE_PREFIX + 'xscale'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'  
+    print(__ATTRIBUTE_PREFIX + 'xscale'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
 
 def yscale(value, **kwargs):
     args = (value)
 
-    return __ATTRIBUTE_PREFIX + 'xscale'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')'  
+    print(__ATTRIBUTE_PREFIX + 'xscale'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')') 
