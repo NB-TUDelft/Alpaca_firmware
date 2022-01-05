@@ -5,6 +5,9 @@
 __PLOT_PREFIX = '%matplotlibdata --'
 __ATTRIBUTE_PREFIX = '%matplotlib --' # Prefix to recognize attribute
 
+import numpy as np
+import binascii
+
 def axhline(y=0, xmin=0, xmax=1, **kwargs):
     """
     Add a horizontal line across the axis.
@@ -290,8 +293,10 @@ def pie(*args, **kwargs):
 
 def plot(*args, scalex=True, scaley=True, data=None, **kwargs):
     # Format for string is {dictionary of settings}[[x axis], [y axis]]
-    xx = args[0]
-    yy = args[1]
+    xx_uc_byte = np.array(args[0], dtype=np.float).tobytes()
+    yy_uc_byte = np.array(args[1], dtype=np.float)
+    yy_shape = yy_uc_byte.shape
+    yy_uc_byte = yy_uc_byte.tobytes()
 
     if len(args) > 2: # add fmt string to kwargs if present:
         kwargs['fmt'] = args[2]
@@ -302,7 +307,12 @@ def plot(*args, scalex=True, scaley=True, data=None, **kwargs):
     kwargs['scaley'] = scaley
     kwargs['data'] = data
 
-    print(__PLOT_PREFIX+str(kwargs) + str([xx, yy]))
+    xx_hex_data = str(binascii.hexlify(xx_uc_byte), 'utf-8')
+    yy_hex_data = str(binascii.hexlify(yy_uc_byte), 'utf-8')
+
+    string = __PLOT_PREFIX+str(kwargs) + '[[' + xx_hex_data + '], [' + yy_hex_data + ']]' + str(yy_shape)
+    print(string)
+    return string
 
 def scatter(*args, **kwargs):
     raise NotImplementedError('matplotlib.pyplot.scatter is not implemented yet for ALPACA.')
