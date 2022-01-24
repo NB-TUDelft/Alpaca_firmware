@@ -4,9 +4,20 @@
 
 version = "0.6" # Module version so students can retrieve their version for debugging
 
+Number = (int, float)
+
+SINE_WAVE_STRINGS = ["Sine", "sine", "S", "s"]
+TRIANGLE_WAVE_STRINGS = ["Triangle", "triangle", "T", "t"]
+SQUARE_WAVE_STRINGS = ["Square", "square", "Block", "block", "B", "b"]
+
+DC_STRINGS = ["DC", "dc", "Flat", "Analog"]
+AC_STRINGS = SINE_WAVE_STRINGS + TRIANGLE_WAVE_STRINGS + SQUARE_WAVE_STRINGS
+
 # This module will be imported on both machines running CPython and MicroPython. If IS_PICO is true, 
 # then the module has been imported on a device running MicroPython, i.e. the Raspberry Pi Pico
 from math import pi
+from ulab import numpy as np
+
 try:
     from machine import SPI, Pin # when not running in MicroPython this will throw an error
     import utime
@@ -76,23 +87,13 @@ class Pico:
     def clear_disk(self):
         import os
         will_clear = False
-        while True:
-            response = input("Remove all files on disk? Please respond with Yes (Y) or No (N):\n Y/[N] ")
-            
-            if response in ("Y","y"):
-                will_clear = True
-                break
-            elif response in ("","n","N"): # Default to No when enter is pressed
-                print("Escaped. Did not remove files")
-                break
-            else:
-                print("Please enter a valid input: Y/[N]")
+        
+        utime.sleep(5)
 
-        if will_clear:
-            print("Remove files...")
-            for file in os.ilistdir():
-                os.remove(file[0])
-                print("Removed ", file[0])
+        print("Remove files...")
+        for file in os.ilistdir():
+            os.remove(file[0])
+            print("Removed ", file[0])
                 
         print("Done.")
 
@@ -184,9 +185,9 @@ class Pico:
         self.isStopping = False
 
         spi, CS, LDAC = self.__setup_spi()
-        if len(args_list) == 4 and not (shape in ["DC", "Flat", "Analog"]):
+        if len(args_list) == 4 and not (shape in DC_STRINGS):
             frequency, low, high, overdrive = args_list
-        elif len(args_list) == 2 and shape in ["DC", "Flat", "Analog"]:
+        elif len(args_list) == 2 and shape in DC_STRINGS:
             # Setup
             CS.value(True)
             LDAC.value(False)
@@ -224,7 +225,7 @@ class Pico:
         if resolution % 2:
             resolution += 1 #only keep even number for convenience for triangle wave
 
-        if shape in ["Sine", "sine", "S", "s"]:
+        if shape in SINE_WAVE_STRINGS:
             from math import sin
 
             values = [None] * resolution
@@ -234,7 +235,7 @@ class Pico:
           
             byte_array = self.__bake_spi_instructions(values)
 
-        elif shape in ["Triangle", "triangle", "T", "t"]:
+        elif shape in TRIANGLE_WAVE_STRINGS:
             values = [None] * resolution
 
             length = resolution // 2 
@@ -244,7 +245,7 @@ class Pico:
             values[length+1:] = [high - (x+1)*(high-low)/length for x in range(length-1)]
             byte_array = self.__bake_spi_instructions(values)
 
-        elif shape in ["Square", "square", "Block", "block", "B", "b"]:
+        elif shape in SQUARE_WAVE_STRINGS:
             #use square wave shape,  for which a resolution of 2 is always sufficient
             resolution = 2 
             values = [high, low]
@@ -302,7 +303,14 @@ class Pico:
         self.__graceful_exit()
         return 
 
-    def start_function_generator(self, shape, *args, overdrive: bool = False):
+    def start_function_generator(self, shape, *args, 
+                                    kw_shape=None, kw_frequency=None,
+                                    kw_DC_value=None,
+                                    kw_min=None, kw_max=None,
+                                    kw_Vpp=None, kw_offset=None,
+                                    kw_duty_cycle=None, 
+                                    kw_symmetry=None,
+                                    overdrive: bool = False):
         """Start the function generator on the Alpaca
 
         Generate an electronic signal using the DAC output A.
@@ -332,8 +340,35 @@ class Pico:
         >>> start_function_generator("DC", 2) # Constant voltage of 2 volts from DAC A
         >>> start_function_generator("sine", 50, 0, 4) # Sine wave with VPP of 4 volts and DC offset of +2 volts at a frequency of 50 Hz
         """
+        # DC input
+        args = None
+
+        if kw_shape is None: # Keyword arguments
+            args = tuple(list(args) + [overdrive])
+
+        elif kw_shape in DC_STRINGS and kw_DC_value is not None: # Keyword arguments for DC
+             args = tuple(["DC", kw_DC_value] + [overdrive])
+        
+
+        elif kw_shape in AC_STRINGS: # Keyword arguments for AC
+            if isinstance(kw_Vpp, Number) and isinstance(kw_offset, Number):
+                # Vpp and offset speficied
+                kw_min = kw_offset - kw_Vpp/2
+                kw_max = kw_offset + kw_Vpp/2
+
+            elif isinstance(kw_min, Number) and isinstance(kw_max, Number):
+                # Min and max specified
+                pass
+
+            else:
+                pass
+
+
+
+
+
         self.baton = _thread.allocate_lock()
-        args = tuple(list(args) + [overdrive])
+        
         try:
             _thread.start_new_thread(self.__function_generator_thread, (shape, args))
         except OSError:
@@ -457,6 +492,13 @@ class Pico:
             else:
                 file.close()
                 raise TypeError("Please input parameters as either a scalar value or a list.")
+
+        if isinstance(samples, (list, tuple, np.ndarray)):
+            for ii, item in enumerate(samples):
+                if isinstance(item, (list, tuple, np.ndarray)):
+                    samples[ii] = list(np.array(item).flatten())
+                
+            samples = list(samples)
 
         # ~~~~~~~~~~~~~~~~~~~ Write samples
         if self.__is_scalar(samples):
