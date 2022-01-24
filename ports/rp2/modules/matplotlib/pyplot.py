@@ -5,7 +5,7 @@
 __PLOT_PREFIX = '%matplotlibdata --'
 __ATTRIBUTE_PREFIX = '%matplotlib --' # Prefix to recognize attribute
 
-import numpy as np
+from ulab import numpy as np
 import binascii
 
 def axhline(y=0, xmin=0, xmax=1, **kwargs):
