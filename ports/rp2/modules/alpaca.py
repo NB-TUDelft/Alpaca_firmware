@@ -30,42 +30,7 @@ import _thread
 
 
 
-# Max voltage the DAC is allowed to produce. Set to 3300 mV in
-# to protect against the DAC frying the Pico
-max_voltage_tolerated = const(3300)
-# Max voltage the DAC can  produce.
-# Will be used in overdrive mode
-max_voltage_overdrive = const(4096)
 
-pin_number_MOSI = const(11)
-pin_number_SCK = const(10)
-pin_number_CS = const(13)
-pin_number_LDAC = const(12)
-
-# Integer value, that when sent to the DAC over SPI will
-# produce the largest voltage. 4096 for the MCP4822
-max_int_value = const(4096)
-
-# Max voltage the DAC can produce measured in millivolts.
-# 4095 for the MCP4822 when the gain has been set to 2.
-max_voltage_gain_2 = const(4095)
-
-# Max voltage the DAC can produce measured in millivolts.
-# 4095 for the MCP4822 when the gain has been set to 2.
-max_voltage_gain_1 = const(2047)
-
-# 114 us write delay, whatever pause we want between
-# writes in our program has to be larger than this
-delay_native = const(100)
-
-setting_A2 = const(16)  # MCP4822 setting byte for DAC A, Gain 2
-setting_A1 = const(48)  # MCP4822 setting byte for DAC A, Gain 1
-setting_B2 = const(144)  # MCP4822 setting byte for DAC B, Gain 2
-setting_B1 = const(176)  # MCP4822 setting byte for DAC B, Gain 1
-
-# 'Safety factor' for calculating how many sample points
-# for DAC wave generation. Higher is rougher shapes.
-fudge_factor = const(3)
 
 def get_version():
     """Retrieve the version of the `nb2211` module.
@@ -91,6 +56,12 @@ class FunctionGenerator:
         """
         self.isStopping = False
 
+    def __graceful_exit(self):
+        # """Method to shut down the function generator gracefully. This prevents 'core 1 in use' errors.
+        # """
+        self.LED.value(False)  # Status LED off
+        self.baton.release()
+
 
 
 
@@ -104,27 +75,22 @@ class Pico:
         self.isStopping = False
 
 
+    def __clip_voltages(self, wcr, overdrive: bool = False):  # paramaters in volts
+        voltages = list(voltages)
+        max_voltage_setting = max_voltage_overdrive if overdrive else max_voltage_tolerated
+        for ii in range(len(voltages)):
+            if voltages[ii] > max_voltage_setting / 1000:  # convert treshold in millivolts to volts
+                voltages[ii] = max_voltage_setting / 1000
 
-    def __graceful_exit(self):
-        # """Method to shut down the function generator gracefully. This prevents 'core 1 in use' errors.
-        # """
-        self.LED.value(False)  # Status LED off
-        self.baton.release()
+            elif voltages[ii] < 0:
+                voltages[ii] = 0
 
-    def __get_setting(self, DAC_A,
-                      GAIN_1_SATISFACTORY):  # Convert desired settings to an integer that corresponds to a correct settings byte
-        # """Converts a boolean input on the desired setting for the MCP4822 DAC into a byte that the device can understand.
-        # """
-        if DAC_A and GAIN_1_SATISFACTORY:
-            return setting_A1
-        elif DAC_A and not GAIN_1_SATISFACTORY:
-            return setting_A2
-        elif not DAC_A and GAIN_1_SATISFACTORY:
-            return setting_B1
+        if len(voltages) == 1:  # Special return for single voltage
+            return voltages[0]
         else:
-            return setting_B2
-
-    def __bake_spi_instructions(self, voltage, DAC_A=True):
+            return voltages
+        
+        def __bake_spi_instructions(self, voltage, DAC_A=True):
         # Based on voltage_to_byte, but also inserts the settings for the MCP4822 DAC into the array of bytes.
         # Expected input: (List of) voltage(s) as float or integer and string specifiying which DAC to use (True = DAC A)
         if type(voltage) is list:
@@ -150,273 +116,7 @@ class Pico:
 
             return byte_array
 
-        else:  # Single value
-            voltage = int(voltage * 1000)
-            GAIN_1_SATISFACTORY = voltage < max_voltage_gain_1
-            byte_array = bytearray(2)
-            integer = (voltage * max_int_value) // (max_voltage_gain_1 if GAIN_1_SATISFACTORY else max_voltage_gain_2)
-            byte_pair = integer.to_bytes(2, 'big')
-            byte_array[1] = byte_pair[1]
-            byte_array[0] = byte_pair[0] | self.__get_setting(DAC_A, GAIN_1_SATISFACTORY)
-
-            return byte_array
-
-    def __clip_voltages(self, *voltages, overdrive: bool = False):  # paramaters in volts
-        voltages = list(voltages)
-        max_voltage_setting = max_voltage_overdrive if overdrive else max_voltage_tolerated
-        for ii in range(len(voltages)):
-            if voltages[ii] > max_voltage_setting / 1000:  # convert treshold in millivolts to volts
-                voltages[ii] = max_voltage_setting / 1000
-
-            elif voltages[ii] < 0:
-                voltages[ii] = 0
-
-        if len(voltages) == 1:  # Special return for single voltage
-            return voltages[0]
-        else:
-            return voltages
-
-    def __setup_spi(self):
-        # returns SPI objects. Used to so objects can be kept locally rather than globally.
-        # Rationale: Local objects can be operated upon more quickly in MicroPython
-        spi = SPI(1,
-                  baudrate=1_000_000,  # 20_000_000,
-                  polarity=1,
-                  phase=1,
-                  bits=8,
-                  firstbit=SPI.MSB,
-                  sck=Pin(pin_number_SCK),
-                  mosi=Pin(pin_number_MOSI),
-                  miso=None)
-        CS = Pin(pin_number_CS, Pin.OUT)
-        LDAC = Pin(pin_number_LDAC, Pin.OUT)
-
-        return spi, CS, LDAC
-
-    def __function_generator_thread(self, shape, args_list):
-        # Setup
-        self.LED = Pin(25, Pin.OUT)
-        self.LED.value(True)
-        self.baton.acquire()
-        self.isStopping = False
-
-        spi, CS, LDAC = self.__setup_spi()
-        if len(args_list) == 4 and not (shape in DC_STRINGS):
-            frequency, low, high, overdrive = args_list
-        elif len(args_list) == 2 and shape in DC_STRINGS:
-            # Setup
-            CS.value(True)
-            LDAC.value(False)
-
-            DC, overdrive = args_list
-            DC = self.__clip_voltages(DC, overdrive=overdrive)
-            buffer = self.__bake_spi_instructions(DC)
-
-            CS.value(False)
-            spi.write(buffer)
-            CS.value(True)
-
-            print('W-DC')  # Done writing
-            self.__graceful_exit()
-            return
-        else:
-            print('Error when starting function generator. When requesting a DC voltage, please enter only one value.' +
-                  'When requesting any other function, please enter three values')
-            self.__graceful_exit()
-            return
-
-        # Continuation of AC write
-        low, high = self.__clip_voltages(low, high, overdrive=overdrive)  # clip
-
-        # Find suitable sine wave, same analysis is also used for triangle wave
-        # 114 us write delay, whatever pause we want between writes in our program has to be larger than this
-        resolution = int(
-            1e6 / frequency / (fudge_factor * delay_native))  # order of magnitude analysis to find nice wave shape
-
-        if resolution > 300:
-            resolution = 300
-
-        if resolution < 10:  # limit where we sacrifce sine 'niceness' for speed
-            resolution = 10
-
-        if resolution % 2:
-            resolution += 1  # only keep even number for convenience for triangle wave
-
-        if shape in SINE_WAVE_STRINGS:
-            from math import sin
-
-            values = [None] * resolution
-            for ii in range(resolution):
-                points = ii / (resolution) * 2 * pi  # sin has a period of 2pi
-                values[ii] = (sin(points) + 1) * 0.5 * abs(high - low) + low
-
-            byte_array = self.__bake_spi_instructions(values)
-
-        elif shape in TRIANGLE_WAVE_STRINGS:
-            values = [None] * resolution
-
-            length = resolution // 2
-            # create the upwards part of the slope
-            values[:length + 1] = [low + x * (high - low) / length for x in range(length + 1)]
-            # create the downwards part of the slope
-            values[length + 1:] = [high - (x + 1) * (high - low) / length for x in range(length - 1)]
-            byte_array = self.__bake_spi_instructions(values)
-
-        elif shape in SQUARE_WAVE_STRINGS:
-            # use square wave shape,  for which a resolution of 2 is always sufficient
-            resolution = 2
-            values = [high, low]
-            byte_array = self.__bake_spi_instructions(values)
-
-        else:
-            print(
-                'Error when finding correct waveform in memory. Did you request a valid wave? Examples are: Sine, Triangle',
-                'Square')
-            self.__graceful_exit()
-            return
-
-        # WRITE ------------------------
-        delay_us = int(1e6 / frequency / resolution)  # delay in loop (in microseconds) necessary to generate wave
-        delay_us = delay_us - 114
-        if delay_us < 0:
-            delay_us = 0
-
-        # print('Resolution = ' + str(resolution) +' points. DAC update delay (us) = '+ str(delay_us))
-
-        target = (2 * resolution - 2)
-        checking_interval = int(frequency) if int(frequency) > 0 else 1
-
-        mv = memoryview(byte_array)
-
-        CS.value(True)
-        LDAC.value(False)
-
-        buffer = bytearray([0, 0])
-        ii = 0  # Counts points written
-        jj = 0  # Counts periods written
-        while True:
-            # PREPARE ---------------------------
-            CS.value(False)
-            buffer[0] = mv[ii]
-            buffer[1] = mv[ii + 1]
-
-            # WRITE POINT -----------------------------
-            spi.write(buffer)
-            CS.value(True)  # Datasheet: Chip select to end before LDAC pulse
-
-            utime.sleep_us(delay_us)
-
-            if ii == target:  # For looping the wave shape
-                ii = 0
-                jj += 1
-            else:
-                ii += 2
-
-            if jj == checking_interval:  # For checking whether or not to stop every couple periods
-                if self.isStopping:
-                    break
-                else:
-                    jj = 0
-
-        print('W-AC')  # Done writing
-        self.__graceful_exit()
-        return
-
-    def start_function_generator(self, shape, *args,
-                                 kw_shape=None, kw_frequency=None,
-                                 kw_DC_value=None,
-                                 kw_min=None, kw_max=None,
-                                 kw_Vpp=None, kw_offset=None,
-                                 kw_duty_cycle=None,
-                                 kw_symmetry=None,
-                                 overdrive: bool = False):
-        """Start the function generator on the Alpaca
-
-        Generate an electronic signal using the DAC output A.
-
-        Parameters
-        ----------
-        shape : {'sine', 'triangle', 'square', 'DC'}
-            Specifies what type of signal to generate. `'sine'` will yield a sine wave, `'triangle'` will yield
-            a symmetric triangle wave, `'square'` will wield a square wave, and `'DC'` will yield a constant voltage.
-        *args : iterable
-            Additional arguments. When `shape` is set to `'DC'`, enter only the value in volts.
-            When `shape` is set to an AC signal, three parameters are needed. These are, `frequency`, `low` and `high`.
-            `frequency` sets the target frequency of the signal (in Hertz). `low` sets the lowest voltage of the periodic signal.
-            `high` sets the peak voltage of the periodic signal.
-
-        See Also
-        --------
-        Pico.stop_function_generator
-
-        Notes
-        -----
-        The MCP4822 DAC on board the Alpaca has a voltage range of 0 to 4.095 volts. Note that this means that valid entries
-        for signals are non-negative and below 4.095 volts for the complete period. To protect the Raspberry Pi Pico from an overvolt, this range is software-
-        limited between 0 and 3.3 volts.
-        Examples
-        --------
-        >>> start_function_generator('DC', 2) # Constant voltage of 2 volts from DAC A
-        >>> start_function_generator('sine', 50, 0, 4) # Sine wave with VPP of 4 volts and DC offset of +2 volts at a frequency of 50 Hz
-        """
-        # DC input
-        args = None
-
-        if kw_shape is None:  # Keyword arguments
-            args = tuple(list(args) + [overdrive])
-
-        elif kw_shape in DC_STRINGS and kw_DC_value is not None:  # Keyword arguments for DC
-            args = tuple(['DC', kw_DC_value] + [overdrive])
-
-
-        elif kw_shape in AC_STRINGS:  # Keyword arguments for AC
-            if isinstance(kw_Vpp, Number) and isinstance(kw_offset, Number):
-                # Vpp and offset speficied
-                kw_min = kw_offset - kw_Vpp / 2
-                kw_max = kw_offset + kw_Vpp / 2
-
-            elif isinstance(kw_min, Number) and isinstance(kw_max, Number):
-                # Min and max specified
-                pass
-
-            else:
-                pass
-
-        self.baton = _thread.allocate_lock()
-
-        try:
-            _thread.start_new_thread(self.__function_generator_thread, (shape, args))
-        except OSError:
-            raise OSError(
-                'Could not start function generator because the function generator is already turned on.\n\n' +
-                'Did you turn off the function generator in the code?\n\nResolve this error by fully rebooting the ALPACA.')
-
-    def stop_function_generator(self):
-        """Stop the function generator on the Alpaca.
-
-        Will halt the function generator on the Alpaca and only returns when this happens succesfully.
-
-        See Also
-        --------
-        Pico.start_function_generator
-        """
-        self.isStopping = True
-
-        self.baton.acquire()  # Check if the other thread has stopped
-        self.baton.release()
-
-        spi, CS, LDAC = self.__setup_spi()
-
-        CS.value(True)
-        LDAC.value(False)
-
-        CS.value(False)
-        spi.write(b'\t\x00')  # Shutdown DAC B
-        CS.value(True)
-
-        CS.value(False)
-        spi.write(b'\x01\x00')  # Shudown DAC A
-        CS.value(True)
+    
 
     def __is_2D_array(self, object):
         result = False
