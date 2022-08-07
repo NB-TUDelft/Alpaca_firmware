@@ -1,7 +1,7 @@
 from ulab import numpy as np
 import _thread
 import utime
-from machine import SPI, Pin
+from machine import SPI, Pin 
 
 # Max voltage the DAC is allowed to produce. Set to 3300 mV in
 # to protect against the DAC frying the Pico
@@ -61,7 +61,6 @@ def is_number(xx, annotation='an input', strict=True):
     else:
         return truth
 
-
 def get_N_step(ff):
     return int(1 / T_DAC_DELAY_US / ff)
 
@@ -81,26 +80,28 @@ class Waveform:
         self.v_min = Vmin
         self.v_max = Vmax
         self.freq = freq
-
+        
         self.array_period = MAX_NUM  # Used to calculate waveforms
-
+        
         self.unsafe = unsafe
-
+        
         self.N_step = None
         self.gain_2 = False
-
+        
     def eq(self, tt):
         pass
 
     def set_N_step(self, N_step):
         self.N_step = N_step
-
+        
     def __str__(self):
         return ('{} with Vmin={} mV, Vmax={} mV, and Frequency={}'
                 .format(type(self).__name__, self.v_min, self.v_max, self.freq))
-
+    
     def get_wcr_array(self):
         return self.__create_wcr_array()
+        
+    
 
     @staticmethod
     def __clean_input(V_PP, V_P, V_min, V_max, offset, freq, unsafe):
@@ -122,7 +123,7 @@ class Waveform:
 
             V_max = offset + V_P
             V_min = offset - V_P
-
+            
         elif has_minmax_input:
             if (is_number(V_max, annotation='V_max')
                     and is_number(V_min, annotation='V_min')):
@@ -138,49 +139,55 @@ class Waveform:
         # Sanity check for frequency
         if freq is None:
             raise ValueError('Expected a keyword "freq" specifying '
-                             'the frequency of the waveform')
+                            'the frequency of the waveform')
         else:
             is_number(freq, annotation='Frequency')
-
+            
         # Sanity check for voltage bounds
         if not unsafe and (V_max > MAX_VOLTAGE_TOLERATED):
             print(('WARNING:functiongenerator:Requested a peak maximum voltage of {} mV \n'
-                   '\tthat is too high for safe mode. To prevent clipping, turn off  \n'
+                  '\tthat is too high for safe mode. To prevent clipping, turn off  \n'
                    '\tsafe mode (not recommended) or request a voltage below {} mV'
                    ).format(V_max, MAX_VOLTAGE_TOLERATED))
-
+            
         elif unsafe and (V_max > MAX_VOLTAGE_OVERDRIVE):
             print(('WARNING:functiongenerator:Requested a peak maximum voltage of {} mV \n'
-                   '\tthat is too high for the DAC. To prevent clipping, \n'
+                  '\tthat is too high for the DAC. To prevent clipping, \n'
                    '\tplease request a voltage below {} mV'
                    ).format(V_max, MAX_VOLTAGE_OVERDRIVE))
-
+            
         elif V_min < MIN_VOLTAGE:
             print(('WARNING:functiongenerator:Requested a peak minimum voltage of {} mV \n'
-                   '\tthat is too low for the DAC. To prevent clipping, \n'
+                  '\tthat is too low for the DAC. To prevent clipping, \n'
                    '\tplease request a voltage above {} mV'
                    ).format(V_min, MIN_VOLTAGE))
-
+            
         return V_min, V_max, freq
+    
+    
 
     def __clip_voltages(self, v_array):
         if self.unsafe:
             v_max = MAX_VOLTAGE_OVERDRIVE
         else:
             v_max = MAX_VOLTAGE_TOLERATED
-
+            
         v_min = MIN_VOLTAGE
-
+        
         v_array[v_array > v_max] = v_max
         v_array[v_array < v_min] = v_min
-
+        
         return v_array
-
+    
     def __voltage_to_integer(self, voltages):
         max_voltage = DAC_MAX_VOLTAGE_GAIN_2 if self.gain_2 else DAC_MAX_VOLTAGE_GAIN_1
+        
+        # print('Gain 2 {}'.format('ON' if self.gain_2 else 'OFF'))
+       
         integers = np.array(voltages * DAC_MAX_INT / max_voltage, dtype=np.uint16)
+        
         return integers
-
+    
     def __create_wcr_array(self):
         if self.N_step is None:  # Need to calculate N_step
             N_step = get_N_step(self.freq)
@@ -192,18 +199,18 @@ class Waveform:
 
         self.set_N_step(N_step)
         tt = np.linspace(0, MAX_NUM - 1, N_step, dtype=np.uint16)
-        voltages = self.eq(tt)  # Use waveform equation
+        voltages = self.eq(tt) # Use waveform equation
         voltages = self.__clip_voltages(voltages)
-
+        
         if self.v_max >= DAC_MAX_VOLTAGE_GAIN_1:
             self.gain_2 = True
         else:
             self.gain_2 = False
-
+            
+        
         integers = self.__voltage_to_integer(voltages)
-
-        return integers.tobytes()
-
+                
+        return integers.byteswap().tobytes()
 
 class Sine(Waveform):
 
@@ -218,8 +225,9 @@ class Sine(Waveform):
                         + 0.5 * abs(self.v_max + self.v_min))
 
 
+    
 #######################################################################
-
+    
 def __setup_spi():
     # returns SPI objects. Used to so objects can be kept locally rather than globally.
     # Rationale: Local objects can be operated upon more quickly in MicroPython
@@ -236,19 +244,19 @@ def __setup_spi():
     LDAC = Pin(PIN_NO_LDAC, Pin.OUT)
 
     return spi, CS, LDAC
-
-
+    
 def __function_generator_thread(wcr_array, freq, N_steps):
+    
     global baton
     global stop_flag
-
+    
     # Setup
     LED = Pin(25, Pin.OUT)
     LED.value(True)
     baton.acquire()
 
     spi, CS, LDAC = __setup_spi()
-
+ 
     # WRITE ------------------------
     delay_us = int(1e6 / freq / N_steps)  # delay in loop (in microseconds) necessary to generate wave
     delay_us = delay_us - 114
@@ -295,41 +303,46 @@ def __function_generator_thread(wcr_array, freq, N_steps):
     print('W-AC')  # Done writing
     LED.value(False)  # Status LED off
     baton.release()
-
+    
     return
-
-
+    
 class FuncGen:
     def __init__(self, waveform: Waveform, DAC: str = 'A', unsafe: bool = False):
         """Construct an instance of the Function Generator class.
         """
-
+        
         global baton
         global stop_flag
-
+        
         baton = _thread.allocate_lock()
         stop_flag = False
-
+        
         self.waveform = waveform
         self.overdrive = unsafe
-
+        
         self.wcr_array = self.waveform.get_wcr_array()
-
+        
         print(self.wcr_array)
-
+        
         for ii in range(len(self.wcr_array) // 2):
-            bb = self.wcr_array[ii * 2: ii * 2 + 2]
+            bb = self.wcr_array[ii*2: ii*2+2]
             integer = int.from_bytes(bb, 'big')
             print('{} \t --> {:016b} --> {}'.format(bb, integer, integer))
-
-        print('Printed {} pairs of bytes, should equal {}'.format(ii + 1, waveform.N_step))
-
+            
+        print('Printed {} pairs of bytes, should equal {}'.format(ii+1, waveform.N_step))
+        
         dac_A = not DAC in ['B', 'b']
-
+        
         self.wcr_array = self.__add_instr_to_wcr_array(self.wcr_array,
                                                        dac_A,
                                                        self.waveform.gain_2)
-
+        print('After applying settings')
+        for ii in range(len(self.wcr_array) // 2):
+            bb = self.wcr_array[ii*2: ii*2+2]
+            integer = int.from_bytes(bb, 'big')
+            print('{} \t --> {:016b} --> {}'.format(bb, integer, integer))
+        
+        
         print(self.wcr_array)
 
     def __enter__(self):
@@ -338,14 +351,15 @@ class FuncGen:
                 self.wcr_array,
                 self.waveform.freq,
                 self.waveform.N_step))
-
+                
         except OSError:
             raise OSError(
                 'Could not start function generator because the function generator is already turned on.\n\n' +
                 'Did you turn off the function generator in the code?\n\nResolve this error by fully rebooting the ALPACA.')
 
+        
         utime.sleep_ms(100)
-
+        
         return None
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
@@ -359,7 +373,7 @@ class FuncGen:
         """
         global baton
         global stop_flag
-
+        
         stop_flag = True
 
         baton.acquire()  # Check if the other thread has stopped
@@ -377,7 +391,7 @@ class FuncGen:
         CS.value(False)
         spi.write(b'\x01\x00')  # Shudown DAC A
         CS.value(True)
-
+        
     def __add_instr_to_wcr_array(self, wcr_array, dac_a=True, gain_2=False):
         ###############################
         if dac_a and not gain_2:
@@ -390,20 +404,24 @@ class FuncGen:
             set_byte = SET_BYTE_B2
         ###############################
 
-        set_byte_array = np.array((len(wcr_array) // 2) * [set_byte], dtype=np.uint16).tobytes()
-
+        set_byte_array = np.array((len(wcr_array) // 2) * [set_byte], dtype=np.uint16).byteswap().tobytes()
+            
         new_wcr_array = bytearray((int.from_bytes(wcr_array, 'big')
-                                   | int.from_bytes(set_byte_array, 'big')
-                                   ).to_bytes(len(wcr_array), 'big'))
+                          | int.from_bytes(set_byte_array, 'big')
+                          ).to_bytes(len(wcr_array), 'big'))
 
         return new_wcr_array
+    
+
+
+    
+    
 
     def __graceful_exit(self):
-        # """Method to shut down the function generator gracefully. This prevents 'core 1 in use' errors.
-        # """
-        self.LED.value(False)  # Status LED off
-        self.baton.release()
-
+            # """Method to shut down the function generator gracefully. This prevents 'core 1 in use' errors.
+            # """
+            self.LED.value(False)  # Status LED off
+            self.baton.release()
 
 if __name__ == '__main__':
     pass
