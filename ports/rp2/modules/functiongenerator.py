@@ -47,11 +47,9 @@ FUDGE_FACTOR = const(1)
 # Max voltage array length
 N_STEP_MAX = const(300)
 N_STEP_MIN = const(16)
-FREQ_MAX = const(625)  # Hz
 
 # Max number for 16-bit integer
 MAX_NUM = const(65535)
-
 
 def is_number(xx, annotation='an input', strict=True):
     Number = (int, float)
@@ -62,7 +60,7 @@ def is_number(xx, annotation='an input', strict=True):
         return truth
 
 def get_N_step(ff):
-    return int(1 / T_DAC_DELAY_US / ff)
+    return int(1E6 / T_DAC_DELAY_US / ff)
 
 
 def is_max(N_step):
@@ -191,11 +189,13 @@ class Waveform:
     def __create_wcr_array(self):
         if self.N_step is None:  # Need to calculate N_step
             N_step = get_N_step(self.freq)
-
+        
             if is_max(N_step):
-                raise ValueError('Requested frequency is too high, try a frequency below ' + str(FREQ_MAX) + ' Hz')
+                N_step = N_STEP_MAX
             elif is_min(N_step):
-                N_step = N_STEP_MIN
+                raise ValueError('Requested frequency is too high, '
+                                 'try a frequency below {} Hz'.format(str(FREQ_MAX) ))
+            
 
         self.set_N_step(N_step)
         tt = np.linspace(0, MAX_NUM - 1, N_step, dtype=np.uint16)
@@ -223,7 +223,39 @@ class Sine(Waveform):
         return np.array(0.5 * abs(self.v_max - self.v_min)
                         * np.sin(2 * np.pi * (tt / self.array_period))
                         + 0.5 * abs(self.v_max + self.v_min))
+    
+class Triangle(Waveform):
 
+    def __init__(self, symmetry=50, **kwargs):
+        super().__init__(**kwargs)
+        
+        if symmetry > 100 or symmetry < 0:
+            raise ValueError('Please input a symmetry between 0 and 100%')
+        
+        self.symmetry = symmetry
+        self.N_step = None  # Floating N
+        self.equation = [self.eq]
+
+
+    def eq(self, tt):
+        frac = self.symmetry/100
+        switch_idx = int(len(tt) * frac)
+        
+        v_pp = abs(self.v_max - self.v_min) 
+        
+        up = np.array(v_pp * tt / self.array_period / frac + self.v_min)
+        up[switch_idx:] = 0
+
+        down_coef = v_pp / self.array_period / (1 - frac)
+        down = np.array(down_coef * tt + self.array_period + self.array_period * down_coef + self.v_min)
+        up[:switch_idx] = 0
+        
+        waveform = up + down
+        
+        for volt in up:
+            print('v: {}'.format(volt))
+        
+        return up + down
 
     
 #######################################################################
@@ -259,7 +291,7 @@ def __function_generator_thread(wcr_array, freq, N_steps):
  
     # WRITE ------------------------
     delay_us = int(1e6 / freq / N_steps)  # delay in loop (in microseconds) necessary to generate wave
-    delay_us = delay_us - 114
+    delay_us = delay_us - T_DAC_DELAY_US
     if delay_us < 0:
         delay_us = 0
 
@@ -322,28 +354,11 @@ class FuncGen:
         
         self.wcr_array = self.waveform.get_wcr_array()
         
-        print(self.wcr_array)
-        
-        for ii in range(len(self.wcr_array) // 2):
-            bb = self.wcr_array[ii*2: ii*2+2]
-            integer = int.from_bytes(bb, 'big')
-            print('{} \t --> {:016b} --> {}'.format(bb, integer, integer))
-            
-        print('Printed {} pairs of bytes, should equal {}'.format(ii+1, waveform.N_step))
-        
         dac_A = not DAC in ['B', 'b']
         
         self.wcr_array = self.__add_instr_to_wcr_array(self.wcr_array,
                                                        dac_A,
                                                        self.waveform.gain_2)
-        print('After applying settings')
-        for ii in range(len(self.wcr_array) // 2):
-            bb = self.wcr_array[ii*2: ii*2+2]
-            integer = int.from_bytes(bb, 'big')
-            print('{} \t --> {:016b} --> {}'.format(bb, integer, integer))
-        
-        
-        print(self.wcr_array)
 
     def __enter__(self):
         try:
