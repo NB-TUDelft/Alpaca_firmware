@@ -195,10 +195,11 @@ class Waveform:
             elif is_min(N_step):
                 raise ValueError('Requested frequency is too high, '
                                  'try a frequency below {} Hz'.format(str(FREQ_MAX) ))
-            
 
-        self.set_N_step(N_step)
-        tt = np.linspace(0, MAX_NUM - 1, N_step, dtype=np.uint16)
+            self.set_N_step(N_step)
+    
+            
+        tt = np.linspace(0, MAX_NUM - 1, self.N_step, dtype=np.uint16)
         voltages = self.eq(tt) # Use waveform equation
         voltages = self.__clip_voltages(voltages)
         
@@ -238,24 +239,55 @@ class Triangle(Waveform):
 
 
     def eq(self, tt):
+        
         frac = self.symmetry/100
-        switch_idx = int(len(tt) * frac)
-        
-        v_pp = abs(self.v_max - self.v_min) 
-        
-        up = np.array(v_pp * tt / self.array_period / frac + self.v_min)
-        up[switch_idx:] = 0
-
-        down_coef = v_pp / self.array_period / (1 - frac)
-        down = np.array(down_coef * tt + self.array_period + self.array_period * down_coef + self.v_min)
-        up[:switch_idx] = 0
-        
-        waveform = up + down
-        
-        for volt in up:
-            print('v: {}'.format(volt))
-        
+        v_pp = abs(self.v_max - self.v_min)
+    
+        if self.symmetry == 0:
+            up = 0
+            
+            down_coef = v_pp / self.array_period / (1 - frac)
+            down = down_coef * tt
+            down = down[::-1]
+            
+        elif self.symmetry == 100:
+            up = v_pp * (tt / self.array_period) / frac + self.v_min
+            
+            down = 0
+            
+        else:
+            switch_idx = int(len(tt) * frac)
+            
+            up = v_pp * (tt / self.array_period) / frac + self.v_min
+            up[switch_idx:] = 0
+            
+            down_coef = v_pp / self.array_period / (1 - frac)
+            down = down_coef * tt
+            down = down[::-1]
+            down[:switch_idx] = 0
+            
         return up + down
+    
+class DC(Waveform):
+
+    def __init__(self, V=None, **kwargs):
+        
+        if not isinstance(V, (float, int)):
+            raise ValueError('Please input the DC voltage as a single number (float or int).')
+        
+        if V is None:
+            raise ValueError('Please input a DC voltage.')
+        
+        super().__init__(Vmin=V, Vmax=V, freq=1)
+        
+        self.V = V * 1000 # Convert to mV
+        self.N_step = 2  # Floating N
+        self.equation = [self.eq]
+
+
+    def eq(self, tt):
+        return np.array([self.V] * 2)
+        
 
     
 #######################################################################
@@ -332,7 +364,7 @@ def __function_generator_thread(wcr_array, freq, N_steps):
             else:
                 jj = 0
 
-    print('W-AC')  # Done writing
+    # print('W-AC')  # Done writing
     LED.value(False)  # Status LED off
     baton.release()
     

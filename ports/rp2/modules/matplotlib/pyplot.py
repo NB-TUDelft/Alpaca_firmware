@@ -8,6 +8,23 @@ __ATTRIBUTE_PREFIX = '%matplotlib --' # Prefix to recognize attribute
 from ulab import numpy as np
 import binascii
 
+def liveplot(*args, labels = None):
+    """
+    """
+    if labels:
+        if isinstance(labels, list) and len(args) == len(labels):
+            pass
+        elif isinstance(labels, str) and len(args) == 1:
+            pass
+        else:
+            raise ValueError("Please input a number of labels equal to the amount of data points to plot.")
+    else:
+        labels = ['l{}'.format(ii) for ii, _ in enumerate(args)]
+    
+    out = ['{} {}'.format(label, arg) for arg, label in zip(args, labels)]
+    out = ' '.join(out)
+    print(out)
+
 def axhline(y=0, xmin=0, xmax=1, **kwargs):
     """
     Add a horizontal line across the axis.
