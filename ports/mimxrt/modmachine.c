@@ -37,8 +37,9 @@
 #include "pin.h"
 #include "modmachine.h"
 #include "fsl_clock.h"
-#include "fsl_ocotp.h"
 #include "fsl_wdog.h"
+
+#if MICROPY_PY_MACHINE
 
 #include CPU_HEADER_H
 
@@ -52,9 +53,7 @@ typedef enum {
 
 STATIC mp_obj_t machine_unique_id(void) {
     unsigned char id[8];
-    OCOTP_Init(OCOTP, CLOCK_GetFreq(kCLOCK_IpgClk));
-    *(uint32_t *)&id[0] = OCOTP->CFG0;
-    *(uint32_t *)&id[4] = OCOTP->CFG1;
+    mp_hal_get_unique_id(id);
     return mp_obj_new_bytes(id, sizeof(id));
 }
 MP_DEFINE_CONST_FUN_OBJ_0(machine_unique_id_obj, machine_unique_id);
@@ -134,6 +133,9 @@ STATIC const mp_rom_map_elem_t machine_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_SoftI2C),             MP_ROM_PTR(&mp_machine_soft_i2c_type) },
     { MP_ROM_QSTR(MP_QSTR_SoftSPI),             MP_ROM_PTR(&mp_machine_soft_spi_type) },
     { MP_ROM_QSTR(MP_QSTR_I2C),                 MP_ROM_PTR(&machine_i2c_type) },
+    #if MICROPY_PY_MACHINE_I2S
+    { MP_ROM_QSTR(MP_QSTR_I2S),                 MP_ROM_PTR(&machine_i2s_type) },
+    #endif
     { MP_ROM_QSTR(MP_QSTR_SPI),                 MP_ROM_PTR(&machine_spi_type) },
     { MP_ROM_QSTR(MP_QSTR_UART),                MP_ROM_PTR(&machine_uart_type) },
     { MP_ROM_QSTR(MP_QSTR_WDT),                 MP_ROM_PTR(&machine_wdt_type) },
@@ -159,3 +161,7 @@ const mp_obj_module_t mp_module_machine = {
     .base = { &mp_type_module },
     .globals = (mp_obj_dict_t *)&machine_module_globals,
 };
+
+MP_REGISTER_MODULE(MP_QSTR_umachine, mp_module_machine);
+
+#endif // MICROPY_PY_MACHINE

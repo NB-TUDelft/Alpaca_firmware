@@ -33,7 +33,6 @@
 
 #if defined(MICROPY_HW_ETH_MDC)
 
-#include "eth.h"
 #include "pin.h"
 #include "shared/netutils/netutils.h"
 #include "extmod/modnetwork.h"
@@ -46,6 +45,7 @@
 #include "hal/phy/device/phydp83825/fsl_phydp83825.h"
 #include "hal/phy/device/phylan8720/fsl_phylan8720.h"
 
+#include "eth.h"
 #include "lwip/etharp.h"
 #include "lwip/dns.h"
 #include "lwip/dhcp.h"
@@ -84,6 +84,11 @@ enet_buffer_config_t buffConfig[] = {{
                                          &g_txBuffDescrip[0],
                                          &g_rxDataBuff[0][0],
                                          &g_txDataBuff[0][0],
+                                         #if FSL_ENET_DRIVER_VERSION >= 0x020300
+                                         0,
+                                         0,
+                                         NULL
+                                         #endif
                                      }};
 
 static uint8_t hw_addr[6]; // The MAC address field
@@ -113,15 +118,11 @@ static const iomux_table_t iomux_table_enet[] = {
 };
 
 #define IOTE (iomux_table_enet[i])
-#ifndef ENET_TX_CLK_OUTPUT
-#define ENET_TX_CLK_OUTPUT true
-#endif
 
 #define TRACE_ASYNC_EV (0x0001)
 #define TRACE_ETH_TX (0x0002)
 #define TRACE_ETH_RX (0x0004)
 #define TRACE_ETH_FULL (0x0008)
-
 
 STATIC void eth_trace(eth_t *self, size_t len, const void *data, unsigned int flags) {
     if (((flags & NETUTILS_TRACE_IS_TX) && (self->trace_flags & TRACE_ETH_TX))
@@ -159,7 +160,11 @@ STATIC void eth_process_frame(eth_t *self, uint8_t *buf, size_t length) {
     }
 }
 
-void eth_irq_handler(ENET_Type *base, enet_handle_t *handle, enet_event_t event, void *userData) {
+void eth_irq_handler(ENET_Type *base, enet_handle_t *handle,
+    #if FSL_FEATURE_ENET_QUEUE > 1
+    uint32_t ringId,
+    #endif /* FSL_FEATURE_ENET_QUEUE > 1 */
+    enet_event_t event, enet_frame_info_t *frameInfo, void *userData) {
     eth_t *self = (eth_t *)userData;
     uint8_t g_rx_frame[ENET_FRAME_MAX_FRAMELEN + 14];
     uint32_t length = 0;
@@ -167,22 +172,24 @@ void eth_irq_handler(ENET_Type *base, enet_handle_t *handle, enet_event_t event,
 
     if (event == kENET_RxEvent) {
         do {
-            status = ENET_GetRxFrameSize(&g_handle, &length);
+            status = ENET_GetRxFrameSize(handle, &length, 0);
             if (status == kStatus_Success) {
                 // Get the data
-                ENET_ReadFrame(ENET, &g_handle, g_rx_frame, length);
+                ENET_ReadFrame(base, handle, g_rx_frame, length, 0, NULL);
                 eth_process_frame(self, g_rx_frame, length);
             } else if (status == kStatus_ENET_RxFrameError) {
-                ENET_ReadFrame(ENET, &g_handle, NULL, 0);
+                ENET_ReadFrame(base, handle, NULL, 0, 0, NULL);
             }
         } while (status != kStatus_ENET_RxFrameEmpty);
     } else {
-        ENET_ClearInterruptStatus(ENET, kENET_TxFrameInterrupt);
+        ENET_ClearInterruptStatus(base, ENET_TX_INTERRUPT | ENET_ERR_INTERRUPT);
     }
 }
 
 // eth_init: Set up GPIO and the transceiver
-void eth_init(eth_t *self, int mac_idx) {
+void eth_init(eth_t *self, int mac_idx, const phy_operations_t *phy_ops, int phy_addr, bool phy_clock) {
+
+    self->netif.num = mac_idx; // Set the interface number
 
     CLOCK_EnableClock(kCLOCK_Iomuxc);
 
@@ -195,7 +202,8 @@ void eth_init(eth_t *self, int mac_idx) {
     const machine_pin_af_obj_t *af_obj = pin_find_af(reset_pin, PIN_AF_MODE_ALT5);
 
     IOMUXC_SetPinMux(reset_pin->muxRegister, af_obj->af_mode, 0, 0, reset_pin->configRegister, 0U);
-    IOMUXC_SetPinConfig(reset_pin->muxRegister, af_obj->af_mode, 0, 0, reset_pin->configRegister, 0xB0A9U);
+    IOMUXC_SetPinConfig(reset_pin->muxRegister, af_obj->af_mode, 0, 0, reset_pin->configRegister,
+        pin_generate_config(PIN_PULL_DISABLED, PIN_MODE_OUT, PIN_DRIVE_5, reset_pin->configRegister));
     GPIO_PinInit(reset_pin->gpio, reset_pin->pin, &gpio_config);
     #endif
 
@@ -205,7 +213,8 @@ void eth_init(eth_t *self, int mac_idx) {
     af_obj = pin_find_af(int_pin, PIN_AF_MODE_ALT5);
 
     IOMUXC_SetPinMux(int_pin->muxRegister, af_obj->af_mode, 0, 0, int_pin->configRegister, 0U);
-    IOMUXC_SetPinConfig(int_pin->muxRegister, af_obj->af_mode, 0, 0, int_pin->configRegister, 0xB0A9U);
+    IOMUXC_SetPinConfig(int_pin->muxRegister, af_obj->af_mode, 0, 0, int_pin->configRegister,
+        pin_generate_config(PIN_PULL_UP_47K, PIN_MODE_IN, PIN_DRIVE_5, int_pin->configRegister));
     GPIO_PinInit(int_pin->gpio, int_pin->pin, &gpio_config);
     #endif
 
@@ -220,12 +229,12 @@ void eth_init(eth_t *self, int mac_idx) {
     }
 
     const clock_enet_pll_config_t config = {
-        .enableClkOutput = true, .enableClkOutput25M = false, .loopDivider = 1
+        .enableClkOutput = phy_clock, .enableClkOutput25M = false, .loopDivider = 1
     };
     CLOCK_InitEnetPll(&config);
 
-    IOMUXC_EnableMode(IOMUXC_GPR, kIOMUXC_GPR_ENET1RefClkMode, false); // Drive ENET_REF_CLK from PAD
-    IOMUXC_EnableMode(IOMUXC_GPR, kIOMUXC_GPR_ENET1TxClkOutputDir, ENET_TX_CLK_OUTPUT);  // Enable output driver
+    IOMUXC_EnableMode(IOMUXC_GPR, kIOMUXC_GPR_ENET1RefClkMode, false); // Do not use the 25 MHz MII clock
+    IOMUXC_EnableMode(IOMUXC_GPR, kIOMUXC_GPR_ENET1TxClkOutputDir, phy_clock);  // Set the clock pad direction
 
     // Reset transceiver
     // pull up the ENET_INT before RESET.
@@ -242,6 +251,8 @@ void eth_init(eth_t *self, int mac_idx) {
 
     mp_hal_get_mac(0, hw_addr);
 
+    phyHandle.ops = phy_ops;
+    phyConfig.phyAddr = phy_addr;
     phyConfig.autoNeg = true;
     mdioHandle.resource.base = ENET;
     mdioHandle.resource.csrClock_Hz = CLOCK_GetFreq(kCLOCK_IpgClk);
@@ -252,7 +263,6 @@ void eth_init(eth_t *self, int mac_idx) {
     phy_speed_t speed = kENET_MiiSpeed100M;
     phy_duplex_t duplex = kENET_MiiFullDuplex;
 
-    phyConfig.phyAddr = ENET_PHY_ADDRESS;
 
     status_t status = PHY_Init(&phyHandle, &phyConfig);
     if (status == kStatus_Success) {
@@ -277,20 +287,19 @@ void eth_init(eth_t *self, int mac_idx) {
         mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("PHY Init failed."));
     }
 
+    ENET_Reset(ENET);
     ENET_GetDefaultConfig(&enet_config);
     enet_config.miiSpeed = (enet_mii_speed_t)speed;
     enet_config.miiDuplex = (enet_mii_duplex_t)duplex;
     enet_config.miiMode = kENET_RmiiMode;
     // Enable checksum generation by the ENET controller
-    // Note: Disabled due to problems with the checksum on ICMP requests
-    // Maybe caused by LWIP inserting 0xffff instead of 0x0000
-    // Keep the code for now until it may be fixed.
-    // enet_config.txAccelerConfig = kENET_TxAccelIpCheckEnabled | kENET_TxAccelProtoCheckEnabled;
+    enet_config.txAccelerConfig = kENET_TxAccelIpCheckEnabled | kENET_TxAccelProtoCheckEnabled;
     // Set interrupt
     enet_config.interrupt |= ENET_TX_INTERRUPT | ENET_RX_INTERRUPT;
 
     ENET_Init(ENET, &g_handle, &enet_config, &buffConfig[0], hw_addr, CLOCK_GetFreq(kCLOCK_IpgClk));
     ENET_SetCallback(&g_handle, eth_irq_handler, (void *)self);
+    NVIC_SetPriority(ENET_IRQn, IRQ_PRI_PENDSV);
     ENET_EnableInterrupts(ENET, ENET_RX_INTERRUPT);
     ENET_ClearInterruptStatus(ENET, ENET_TX_INTERRUPT | ENET_RX_INTERRUPT | ENET_ERR_INTERRUPT);
     ENET_ActiveRead(ENET);
@@ -312,6 +321,22 @@ void eth_set_trace(eth_t *self, uint32_t value) {
 /*******************************************************************************/
 // ETH-LwIP bindings
 
+STATIC err_t eth_send_frame_blocking(ENET_Type *base, enet_handle_t *handle, uint8_t *buffer, int len) {
+    status_t status;
+    int i;
+    #define XMIT_LOOP 10
+
+    // Try a few times to send the frame
+    for (i = XMIT_LOOP; i > 0; i--) {
+        status = ENET_SendFrame(base, handle, buffer, len, 0, false, NULL);
+        if (status != kStatus_ENET_TxFrameBusy) {
+            break;
+        }
+        ticks_delay_us64(100);
+    }
+    return status;
+}
+
 STATIC err_t eth_netif_output(struct netif *netif, struct pbuf *p) {
     // This function should always be called from a context where PendSV-level IRQs are disabled
     status_t status;
@@ -320,7 +345,7 @@ STATIC err_t eth_netif_output(struct netif *netif, struct pbuf *p) {
     eth_trace(netif->state, (size_t)-1, p, NETUTILS_TRACE_IS_TX | NETUTILS_TRACE_NEWLINE);
 
     if (p->next == NULL) {
-        status = ENET_SendFrame(ENET, &g_handle, p->payload, p->len);
+        status = eth_send_frame_blocking(ENET, &g_handle, p->payload, p->len);
     } else {
         // frame consists of several parts. Copy them together and send them
         size_t length = 0;
@@ -331,7 +356,7 @@ STATIC err_t eth_netif_output(struct netif *netif, struct pbuf *p) {
             length += p->len;
             p = p->next;
         }
-        status = ENET_SendFrame(ENET, &g_handle, tx_frame, length);
+        status = eth_send_frame_blocking(ENET, &g_handle, tx_frame, length);
     }
     return status == kStatus_Success ? ERR_OK : ERR_BUF;
 }
@@ -348,11 +373,6 @@ STATIC err_t eth_netif_init(struct netif *netif) {
         | NETIF_CHECKSUM_CHECK_TCP
         | NETIF_CHECKSUM_CHECK_ICMP
         | NETIF_CHECKSUM_CHECK_ICMP6
-        | NETIF_CHECKSUM_GEN_IP
-        | NETIF_CHECKSUM_GEN_UDP
-        | NETIF_CHECKSUM_GEN_TCP
-        | NETIF_CHECKSUM_GEN_ICMP
-        | NETIF_CHECKSUM_GEN_ICMP6
         );
     return ERR_OK;
 }

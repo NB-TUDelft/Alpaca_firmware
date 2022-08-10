@@ -5,6 +5,7 @@ CROSS = 0
 QSTR_DEFS = qstrdefsport.h
 
 include $(TOP)/py/py.mk
+include $(TOP)/extmod/extmod.mk
 
 CC = emcc
 LD = emcc
@@ -16,13 +17,6 @@ INC += -I$(BUILD)
 CFLAGS += -std=c99 -Wall -Werror -Wdouble-promotion -Wfloat-conversion
 CFLAGS += -O3 -DNDEBUG
 CFLAGS += $(INC)
-
-ifneq ($(FROZEN_MPY_DIR),)
-# To use frozen bytecode, put your .py files in a subdirectory (eg frozen/) and
-# then invoke make with FROZEN_MPY_DIR=frozen (be sure to build from scratch).
-CFLAGS += -DMICROPY_QSTR_EXTRA_POOL=mp_qstr_frozen_const_pool
-CFLAGS += -DMICROPY_MODULE_FROZEN_MPY
-endif
 
 SRC_SHARED = $(addprefix shared/,\
 	runtime/interrupt_char.c \
@@ -36,7 +30,7 @@ SRC_C = \
 	mphalport.c \
 	modutime.c \
 
-SRC_QSTR += $(SRC_C)
+SRC_QSTR += $(SRC_C) $(SRC_SHARED)
 
 OBJ += $(PY_O)
 OBJ += $(addprefix $(BUILD)/, $(SRC_SHARED:.c=.o))
@@ -58,8 +52,5 @@ min: $(BUILD)/micropython.js
 test: $(BUILD)/micropython.js $(TOP)/tests/run-tests.py
 	$(eval DIRNAME=ports/$(notdir $(CURDIR)))
 	cd $(TOP)/tests && MICROPY_MICROPYTHON=../ports/javascript/node_run.sh ./run-tests.py -j1
-
-# Disable errors for array-bounds warnings on "sp[-MP_OBJ_ITER_BUF_NSLOTS + 2]" access.
-$(BUILD)/py/vm.o: CFLAGS += -Wno-error=array-bounds
 
 include $(TOP)/py/mkrules.mk

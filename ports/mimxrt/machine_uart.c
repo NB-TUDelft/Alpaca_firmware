@@ -32,6 +32,7 @@
 #include "fsl_common.h"
 #include "fsl_lpuart.h"
 #include "fsl_iomuxc.h"
+#include CLOCK_CONFIG_H
 
 #define DEFAULT_UART_BAUDRATE (115200)
 #define DEFAULT_BUFFER_SIZE (256)
@@ -84,26 +85,16 @@ bool lpuart_set_iomux(int8_t uart) {
 
     if (TX.muxRegister != 0) {
         IOMUXC_SetPinMux(TX.muxRegister, TX.muxMode, TX.inputRegister, TX.inputDaisy, TX.configRegister, 0U);
-        IOMUXC_SetPinConfig(TX.muxRegister, TX.muxMode, TX.inputRegister, TX.inputDaisy, TX.configRegister, 0x10B0u);
+        IOMUXC_SetPinConfig(TX.muxRegister, TX.muxMode, TX.inputRegister, TX.inputDaisy, TX.configRegister,
+            pin_generate_config(PIN_PULL_UP_100K, PIN_MODE_OUT, PIN_DRIVE_6, TX.configRegister));
 
         IOMUXC_SetPinMux(RX.muxRegister, RX.muxMode, RX.inputRegister, RX.inputDaisy, RX.configRegister, 0U);
-        IOMUXC_SetPinConfig(RX.muxRegister, RX.muxMode, RX.inputRegister, RX.inputDaisy, RX.configRegister, 0x10B0u);
+        IOMUXC_SetPinConfig(RX.muxRegister, RX.muxMode, RX.inputRegister, RX.inputDaisy, RX.configRegister,
+            pin_generate_config(PIN_PULL_UP_100K, PIN_MODE_IN, PIN_DRIVE_6, RX.configRegister));
         return true;
     } else {
         return false;
     }
-}
-
-uint32_t UART_SrcFreq(void) {
-    uint32_t freq;
-    // To make it simple, we assume default PLL and divider settings, and the
-    // only variable from application is use PLL3 source or OSC source.
-    if (CLOCK_GetMux(kCLOCK_UartMux) == 0) { // PLL3 div6 80M
-        freq = (CLOCK_GetPllFreq(kCLOCK_PllUsb1) / 6U) / (CLOCK_GetDiv(kCLOCK_UartDiv) + 1U);
-    } else {
-        freq = CLOCK_GetOscFreq() / (CLOCK_GetDiv(kCLOCK_UartDiv) + 1U);
-    }
-    return freq;
 }
 
 void LPUART_UserCallback(LPUART_Type *base, lpuart_handle_t *handle, status_t status, void *userData) {
@@ -217,7 +208,7 @@ STATIC mp_obj_t machine_uart_init_helper(machine_uart_obj_t *self, size_t n_args
     }
 
     // Initialise the UART peripheral if any arguments given, or it was not initialised previously.
-    if (n_args > 1 || self->new) {
+    if (n_args > 0 || kw_args->used > 0 || self->new) {
         self->new = false;
         // may be obsolete
         if (self->config.baudRate_Bps == 0) {
@@ -230,7 +221,7 @@ STATIC mp_obj_t machine_uart_init_helper(machine_uart_obj_t *self, size_t n_args
             self->timeout_char = min_timeout_char;
         }
 
-        LPUART_Init(self->lpuart, &self->config, UART_SrcFreq()); // ??
+        LPUART_Init(self->lpuart, &self->config, BOARD_BOOTCLOCKRUN_UART_CLK_ROOT); // ??
         LPUART_TransferCreateHandle(self->lpuart, &self->handle,  LPUART_UserCallback, self);
         uint8_t *buffer = m_new(uint8_t, rxbuf_len + 1);
         LPUART_TransferStartRingBuffer(self->lpuart, &self->handle, buffer, rxbuf_len);
@@ -269,14 +260,13 @@ STATIC mp_obj_t machine_uart_make_new(const mp_obj_type_t *type, size_t n_args, 
 
     // Get UART bus.
     int uart_id = mp_obj_get_int(args[0]);
-    if (uart_id < 1 || uart_id > MICROPY_HW_UART_NUM) {
+    if (uart_id < 0 || uart_id > MICROPY_HW_UART_NUM || uart_index_table[uart_id] == 0) {
         mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("UART(%d) doesn't exist"), uart_id);
     }
 
     // Create the UART object and fill it with defaults.
     uint8_t uart_hw_id = uart_index_table[uart_id];  // the hw uart number 1..n
-    machine_uart_obj_t *self = m_new_obj(machine_uart_obj_t);
-    self->base.type = &machine_uart_type;
+    machine_uart_obj_t *self = mp_obj_malloc(machine_uart_obj_t, &machine_uart_type);
     self->id = uart_id;
     self->lpuart = uart_base_ptr_table[uart_hw_id];
     self->invert = false;
@@ -286,11 +276,15 @@ STATIC mp_obj_t machine_uart_make_new(const mp_obj_type_t *type, size_t n_args, 
     LPUART_GetDefaultConfig(&self->config);
 
     // Configure board-specific pin MUX based on the hardware device number.
-    lpuart_set_iomux(uart_hw_id);
+    bool uart_present = lpuart_set_iomux(uart_hw_id);
 
-    mp_map_t kw_args;
-    mp_map_init_fixed_table(&kw_args, n_kw, args + n_args);
-    return machine_uart_init_helper(self, n_args - 1, args + 1, &kw_args);
+    if (uart_present) {
+        mp_map_t kw_args;
+        mp_map_init_fixed_table(&kw_args, n_kw, args + n_args);
+        return machine_uart_init_helper(self, n_args - 1, args + 1, &kw_args);
+    } else {
+        return mp_const_none;
+    }
 }
 
 // uart.init(baud, [kwargs])
