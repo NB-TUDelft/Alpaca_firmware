@@ -143,22 +143,25 @@ class Waveform:
             
         # Sanity check for voltage bounds
         if not unsafe and (V_max > MAX_VOLTAGE_TOLERATED):
-            print(('WARNING:functiongenerator:Requested a peak maximum voltage of {} mV \n'
-                  '\tthat is too high for safe mode. To prevent clipping, turn off  \n'
-                   '\tsafe mode (not recommended) or request a voltage below {} mV'
-                   ).format(V_max, MAX_VOLTAGE_TOLERATED))
+            pass
+            # print(('WARNING:functiongenerator:Requested a peak maximum voltage of {} mV \n'
+            #       '\tthat is too high for safe mode. To prevent clipping, turn off  \n'
+            #        '\tsafe mode (not recommended) or request a voltage below {} mV'
+            #        ).format(V_max, MAX_VOLTAGE_TOLERATED))
             
         elif unsafe and (V_max > MAX_VOLTAGE_OVERDRIVE):
-            print(('WARNING:functiongenerator:Requested a peak maximum voltage of {} mV \n'
-                  '\tthat is too high for the DAC. To prevent clipping, \n'
-                   '\tplease request a voltage below {} mV'
-                   ).format(V_max, MAX_VOLTAGE_OVERDRIVE))
+            pass
+            # print(('WARNING:functiongenerator:Requested a peak maximum voltage of {} mV \n'
+            #       '\tthat is too high for the DAC. To prevent clipping, \n'
+            #        '\tplease request a voltage below {} mV'
+            #        ).format(V_max, MAX_VOLTAGE_OVERDRIVE))
             
         elif V_min < MIN_VOLTAGE:
-            print(('WARNING:functiongenerator:Requested a peak minimum voltage of {} mV \n'
-                  '\tthat is too low for the DAC. To prevent clipping, \n'
-                   '\tplease request a voltage above {} mV'
-                   ).format(V_min, MIN_VOLTAGE))
+            pass
+            # print(('WARNING:functiongenerator:Requested a peak minimum voltage of {} mV \n'
+            #       '\tthat is too low for the DAC. To prevent clipping, \n'
+            #        '\tplease request a voltage above {} mV'
+            #        ).format(V_min, MIN_VOLTAGE))
             
         return V_min, V_max, freq
     
