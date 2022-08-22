@@ -311,10 +311,14 @@ def pie(*args, **kwargs):
 def plot(*args, scalex=True, scaley=True, data=None, **kwargs):
     # Format for string is {dictionary of settings}[[x axis], [y axis]]
     xx_uc_byte = np.array(args[0], dtype=np.float).tobytes()
-    if isinstance(args[1], (np.ndarray, list)):
+
+    if len(args) == 1:
+        yy = np.arange(len(args[0]))
+    elif isinstance(args[1], (np.ndarray, list)):
         yy = args[1]
     else:
         yy = np.arange(len(args[0]))
+
     yy_uc_byte = np.array(yy, dtype=np.float)
     yy_shape = yy_uc_byte.shape
     yy_uc_byte = yy_uc_byte.tobytes()
