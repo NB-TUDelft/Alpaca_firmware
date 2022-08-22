@@ -315,7 +315,7 @@ def plot(*args, scalex=True, scaley=True, data=None, **kwargs):
     good_args = sum([isinstance(arg, (np.ndarray, list)) for arg in args])
 
     if good_args == 1:
-        xx_uc_byte = np.arange(len(args[0])).tobytes()
+        xx_uc_byte = np.arange(len(args[0]), dtype=np.float).tobytes()
         yy = args[0]
     else:
         xx_uc_byte = np.array(args[0], dtype=np.float).tobytes()
