@@ -70,6 +70,21 @@ def is_max(N_step):
 def is_min(N_step):
     return N_step <= N_STEP_MIN
 
+def as_fraction(number: float, accuracy: float = 0.0001) -> (int, int):
+    # https://codereview.stackexchange.com/questions/159758/efficiently-
+    # finding-approximate-fraction-with-tolerance-for-fp-rounding
+    whole, x = divmod(number, 1)
+    if not x:
+        return int(whole), 1
+    n = 1
+    while True:
+        d = int(n/x)
+        if n/d-x < accuracy:
+            return int(whole)*d+n, d
+        d += 1
+        if x-n/d < accuracy:
+            return int(whole)*d+n, d
+        n += 1
 
 class Waveform:
 
@@ -290,9 +305,38 @@ class DC(Waveform):
 
     def eq(self, tt):
         return np.array([self.V] * 2)
-        
 
-    
+
+class Square(Waveform):
+
+    def __init__(self, duty_cycle: int = 50, **kwargs):
+        self.duty_cycle = int(duty_cycle)
+
+        if self.duty_cycle > 100 or self.duty_cycle < 0:
+            raise ValueError('Please input a duty cycle between 0 and 100%')
+
+        super().__init__(**kwargs)
+
+        if self.duty_cycle == 100 or self.duty_cycle == 0:
+            self.fraction = None
+            self.N_step = 2  # Fixed N
+        else:
+
+            self.fraction = as_fraction(self.duty_cycle / 100)
+            self.fraction = (self.fraction[1] - self.fraction[0], self.fraction[0])
+            self.N_step = sum(self.fraction)
+
+        self.equation = [self.eq]
+
+    def eq(self, tt):
+        if self.duty_cycle == 100:
+            return np.array([self.v_max] * 2)
+        elif self.duty_cycle == 0:
+            return np.array([self.v_min] * 2)
+        else:
+
+            return np.array([self.v_min] * self.fraction[0] + [self.v_max] * self.fraction[1])
+
 #######################################################################
     
 def __setup_spi():
