@@ -357,7 +357,7 @@ def __setup_spi():
     return spi, CS, LDAC
 
 @micropython.viper
-def __function_generator_thread(wcr_array: bytearray, freq: float, N_steps: int) -> None:
+def __function_generator_thread(wcr_array: bytearray, freq_mHz: int, N_steps: int) -> None:
     
     global baton
     global stop_flag
@@ -370,7 +370,7 @@ def __function_generator_thread(wcr_array: bytearray, freq: float, N_steps: int)
     spi, CS, LDAC = __setup_spi()
  
     # WRITE ------------------------
-    delay_us = int(1e6 / freq / N_steps)  # delay in loop (in microseconds) necessary to generate wave
+    delay_us = int(1e3 / freq_mHz / N_steps)  # delay in loop (in microseconds) necessary to generate wave
     delay_us = delay_us - T_DAC_DELAY_US
     if delay_us < 0:
         delay_us = 0
@@ -378,7 +378,7 @@ def __function_generator_thread(wcr_array: bytearray, freq: float, N_steps: int)
     # print('Resolution = ' + str(resolution) +' points. DAC update delay (us) = '+ str(delay_us))
 
     target = (2 * N_steps - 2)
-    checking_interval = int(freq) if int(freq) > 0 else 1
+    checking_interval = int(freq_mHz) if int(freq_mHz) > 0 else 1
 
     mv = memoryview(wcr_array)
 
@@ -444,8 +444,9 @@ class FuncGen:
         try:
             _thread.start_new_thread(__function_generator_thread, (
                 self.wcr_array,
-                self.waveform.freq,
+                int(self.waveform.freq * 1000),
                 self.waveform.N_step))
+            # Convert frequency in Hz to mHz
                 
         except OSError:
             raise OSError(
