@@ -70,6 +70,7 @@ def is_max(N_step):
 def is_min(N_step):
     return N_step <= N_STEP_MIN
 
+@micropython.native
 def as_fraction(number: float, accuracy: float = 0.0001) -> (int, int):
     # https://codereview.stackexchange.com/questions/159758/efficiently-
     # finding-approximate-fraction-with-tolerance-for-fp-rounding
@@ -180,8 +181,7 @@ class Waveform:
             
         return V_min, V_max, freq
 
-
-
+    @micropython.native
     def __clip_voltages(self, v_array):
         if self.unsafe:
             v_max = MAX_VOLTAGE_OVERDRIVE
@@ -195,6 +195,7 @@ class Waveform:
         
         return v_array
 
+    @micropython.native
     def __voltage_to_integer(self, voltages):
         max_voltage = DAC_MAX_VOLTAGE_GAIN_2 if self.gain_2 else DAC_MAX_VOLTAGE_GAIN_1
         
@@ -204,6 +205,7 @@ class Waveform:
         
         return integers
 
+    @micropython.native
     def __create_wcr_array(self):
         if self.N_step is None:  # Need to calculate N_step
             N_step = get_N_step(self.freq)
