@@ -179,8 +179,8 @@ class Waveform:
             #        ).format(V_min, MIN_VOLTAGE))
             
         return V_min, V_max, freq
-    
-    
+
+
 
     def __clip_voltages(self, v_array):
         if self.unsafe:
@@ -194,7 +194,7 @@ class Waveform:
         v_array[v_array < v_min] = v_min
         
         return v_array
-    
+
     def __voltage_to_integer(self, voltages):
         max_voltage = DAC_MAX_VOLTAGE_GAIN_2 if self.gain_2 else DAC_MAX_VOLTAGE_GAIN_1
         
@@ -203,7 +203,7 @@ class Waveform:
         integers = np.array(voltages * DAC_MAX_INT / max_voltage, dtype=np.uint16)
         
         return integers
-    
+
     def __create_wcr_array(self):
         if self.N_step is None:  # Need to calculate N_step
             N_step = get_N_step(self.freq)
@@ -355,8 +355,9 @@ def __setup_spi():
     LDAC = Pin(PIN_NO_LDAC, Pin.OUT)
 
     return spi, CS, LDAC
-    
-def __function_generator_thread(wcr_array, freq, N_steps):
+
+@micropython.viper
+def __function_generator_thread(wcr_array: bytearray, freq: float, N_steps: int) -> None:
     
     global baton
     global stop_flag
@@ -452,7 +453,7 @@ class FuncGen:
                 'Did you turn off the function generator in the code?\n\nResolve this error by fully rebooting the ALPACA.')
 
         
-        utime.sleep_ms(100)
+        utime.sleep_ms(10)
         
         return None
 
