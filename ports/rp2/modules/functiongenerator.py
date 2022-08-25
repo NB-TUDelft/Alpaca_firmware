@@ -356,7 +356,7 @@ def __setup_spi():
 
     return spi, CS, LDAC
 
-@micropython.viper
+@micropython.native
 def __function_generator_thread(wcr_array: bytearray, freq_mHz: int, N_steps: int) -> None:
     
     global baton
