@@ -33,7 +33,7 @@ DAC_MAX_VOLTAGE_GAIN_1 = const(2047)
 
 # 114 us write delay, whatever pause we want between
 # writes in our program has to be larger than this
-T_DAC_DELAY_US = const(100)
+T_DAC_DELAY_US = const(73)
 
 SET_BYTE_A1 = const(12288)  # MCP4822 setting byte for DAC A, Gain 1
 SET_BYTE_A2 = const(4096)  # MCP4822 setting byte for DAC A, Gain 2
