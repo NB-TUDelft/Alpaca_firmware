@@ -380,7 +380,7 @@ def __function_generator_thread(wcr_array: bytearray, freq_mHz: int, N_steps: in
     # print('Resolution = ' + str(resolution) +' points. DAC update delay (us) = '+ str(delay_us))
 
     target = (2 * N_steps - 2)
-    checking_interval = int(freq_mHz) if int(freq_mHz) > 0 else 1
+    checking_interval = int(freq_mHz/1000) if int(freq_mHz/1000) > 0 else 1
 
     mv = memoryview(wcr_array)
 
