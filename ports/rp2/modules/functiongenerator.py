@@ -372,7 +372,7 @@ def __function_generator_thread(wcr_array: bytearray, freq_mHz: int, N_steps: in
     spi, CS, LDAC = __setup_spi()
  
     # WRITE ------------------------
-    delay_us = int(1e3 / freq_mHz / N_steps)  # delay in loop (in microseconds) necessary to generate wave
+    delay_us = int(1e9 / freq_mHz / N_steps)  # delay in loop (in microseconds) necessary to generate wave
     delay_us = delay_us - T_DAC_DELAY_US
     if delay_us < 0:
         delay_us = 0
