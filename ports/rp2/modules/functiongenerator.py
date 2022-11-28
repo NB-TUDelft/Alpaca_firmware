@@ -98,6 +98,7 @@ class Waveform:
         self.array_period = MAX_NUM  # Used to calculate waveforms
         
         self.unsafe = unsafe
+        self.hold = False
         
         self.N_step = None
         self.gain_2 = False
@@ -290,7 +291,7 @@ class Triangle(Waveform):
     
 class DC(Waveform):
 
-    def __init__(self, V=None, **kwargs):
+    def __init__(self, V=None, hold=False, **kwargs):
         
         if not isinstance(V, (float, int)):
             raise ValueError('Please input the DC voltage as a single number (float or int).')
@@ -303,6 +304,7 @@ class DC(Waveform):
         self.V = V * 1000 # Convert to mV
         self.N_step = 2  # Floating N
         self.equation = [self.eq]
+        self.hold = hold
 
 
     def eq(self, tt):
@@ -477,18 +479,19 @@ class FuncGen:
         baton.acquire()  # Check if the other thread has stopped
         baton.release()
 
-        spi, CS, LDAC = __setup_spi()
+        if not self.waveform.hold:
+            spi, CS, LDAC = __setup_spi()
 
-        CS.value(True)
-        LDAC.value(False)
+            CS.value(True)
+            LDAC.value(False)
 
-        CS.value(False)
-        spi.write(b'\t\x00')  # Shutdown DAC B
-        CS.value(True)
+            CS.value(False)
+            spi.write(b'\t\x00')  # Shutdown DAC B
+            CS.value(True)
 
-        CS.value(False)
-        spi.write(b'\x01\x00')  # Shudown DAC A
-        CS.value(True)
+            CS.value(False)
+            spi.write(b'\x01\x00')  # Shudown DAC A
+            CS.value(True)
         
     def __add_instr_to_wcr_array(self, wcr_array, dac_a=True, gain_2=False):
         ###############################
