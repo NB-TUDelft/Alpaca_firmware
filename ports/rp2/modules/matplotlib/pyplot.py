@@ -1,14 +1,17 @@
 # Format for plot is __PLOT_PREFIX{dictionary of settings}[[x axis], [y axis]]
-           
+
 # Format for attribute is __ATTRIBUTE_PREFIXattribute(parameters)
 
 __PLOT_PREFIX = '%matplotlibdata --'
-__ATTRIBUTE_PREFIX = '%matplotlib --' # Prefix to recognize attribute
+__LONG_PLOT_PREFIX = '%matplotlibdatalongSTART --'
+__LONG_PLOT_SUFFIX = '%matplotlibdatalongEND'
+__ATTRIBUTE_PREFIX = '%matplotlib --'  # Prefix to recognize attribute
 
 from ulab import numpy as np
 import binascii
 
-def liveplot(*args, labels = None):
+
+def liveplot(*args, labels=None):
     """
     """
     if labels:
@@ -20,10 +23,11 @@ def liveplot(*args, labels = None):
             raise ValueError("Please input a number of labels equal to the amount of data points to plot.")
     else:
         labels = ['l{}'.format(ii) for ii, _ in enumerate(args)]
-    
+
     out = ['{} {}'.format(label, arg) for arg, label in zip(args, labels)]
     out = ' '.join(out)
     print(out)
+
 
 def axhline(y=0, xmin=0, xmax=1, **kwargs):
     """
@@ -67,7 +71,8 @@ def axhline(y=0, xmin=0, xmax=1, **kwargs):
     kwargs['xmax'] = xmax
     args = ()
 
-    print(__ATTRIBUTE_PREFIX + 'axhline'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'axhline' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def axvline(x=0, ymin=0, ymax=1, **kwargs):
     """
@@ -111,16 +116,20 @@ def axvline(x=0, ymin=0, ymax=1, **kwargs):
     kwargs['ymax'] = ymax
     args = ()
 
-    print(__ATTRIBUTE_PREFIX + 'axvline'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'axvline' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def show():
     raise NotImplementedError('matplotlib.pyplot.show is not implemented yet for ALPACA.')
-    
+
+
 def pause():
     raise NotImplementedError('matplotlib.pyplot.pause is not implemented yet for ALPACA.')
 
+
 def figure(*args, **kwargs):
     raise NotImplementedError('matplotlib.pyplot.figure is not implemented yet for ALPACA.')
+
 
 def close(fig=None):
     """
@@ -128,12 +137,15 @@ def close(fig=None):
     """
     raise NotImplementedError('matplotlib.pyplot.close is not implemented yet for ALPACA.')
 
+
 def clf():
     """Clear the current figure."""
     raise NotImplementedError('matplotlib.pyplot.clf is not implemented yet for ALPACA.')
 
+
 def draw():
     raise NotImplementedError('matplotlib.pyplot.draw is not implemented yet for ALPACA.')
+
 
 def savefig(*args, **kwargs):
     raise NotImplementedError('matplotlib.pyplot.savefig is not implemented yet for ALPACA.')
@@ -148,13 +160,15 @@ def subplot(*args, **kwargs):
     """Add an Axes to the current figure or retrieve an existing Axes."""
     raise NotImplementedError('matplotlib.pyplot.subplot is not implemented yet for ALPACA.')
 
+
 # Plotting should happen via pyplot
 def subplots(nrows=1, ncols=1, *, sharex=False, sharey=False, squeeze=True,
              subplot_kw=None, gridspec_kw=None, **fig_kw):
     """
     Create a figure and a set of subplots.
     """
-    raise NotImplementedError('matplotlib.pyplot.subplots is not implemented yet for ALPACA. Instead, please use matplotib.pyplot.plot')
+    raise NotImplementedError(
+        'matplotlib.pyplot.subplots is not implemented yet for ALPACA. Instead, please use matplotib.pyplot.plot')
 
 
 def xlim(*args, **kwargs):
@@ -180,7 +194,8 @@ def xlim(*args, **kwargs):
     Calling this function with arguments is the pyplot equivalent of calling
     `~.Axes.set_xlim` on the current axes. All arguments are passed though.
     """
-    print(__ATTRIBUTE_PREFIX + 'xlim'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'xlim' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def ylim(*args, **kwargs):
     """
@@ -205,7 +220,8 @@ def ylim(*args, **kwargs):
     Calling this function with arguments is the pyplot equivalent of calling
     `~.Axes.set_ylim` on the current axes. All arguments are passed though.
     """
-    print(__ATTRIBUTE_PREFIX + 'ylim'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'ylim' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def xticks(ticks=None, labels=None, **kwargs):
     """
@@ -239,7 +255,8 @@ def xticks(ticks=None, labels=None, **kwargs):
     kwargs['labels'] = labels
     args = ()
 
-    print(__ATTRIBUTE_PREFIX + 'xticks'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'xticks' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def yticks(ticks=None, labels=None, **kwargs):
     """
@@ -272,24 +289,27 @@ def yticks(ticks=None, labels=None, **kwargs):
     kwargs['labels'] = labels
     args = ()
 
-    print(__ATTRIBUTE_PREFIX + 'yticks'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'yticks' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
 
 
 def polar(*args, **kwargs):
     """Make a polar plot."""
     raise NotImplementedError('matplotlib.pyplot.polar is not implemented yet for ALPACA.')
 
+
 def errorbar(*args, **kwargs):
     raise NotImplementedError('matplotlib.pyplot.errorbar is not implemented yet for ALPACA.')
 
+
 def grid(*args, **kwargs):
-    print(__ATTRIBUTE_PREFIX + 'grid'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'grid' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def hist(*args, **kwargs):
     raise NotImplementedError('matplotlib.pyplot.hist is not implemented yet for ALPACA.')
 
-def hlines(y, xmin, xmax, colors=None, linestyles='solid', label='', data=None, **kwargs):
 
+def hlines(y, xmin, xmax, colors=None, linestyles='solid', label='', data=None, **kwargs):
     kwargs['colors'] = colors
     kwargs['linestyles'] = linestyles
     kwargs['label'] = label
@@ -297,35 +317,29 @@ def hlines(y, xmin, xmax, colors=None, linestyles='solid', label='', data=None, 
 
     args = (y, xmin, xmax)
 
-    print(__ATTRIBUTE_PREFIX + 'hlines'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'hlines' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def legend(*args, **kwargs):
-    print(__ATTRIBUTE_PREFIX + 'legend'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'legend' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def loglog(*args, **kwargs):
-    raise NotImplementedError('matplotlib.pyplot.loglog is not implemented yet for ALPACA. Please use xscale and yscale.')
+    raise NotImplementedError(
+        'matplotlib.pyplot.loglog is not implemented yet for ALPACA. Please use xscale and yscale.')
+
 
 def pie(*args, **kwargs):
     raise NotImplementedError('matplotlib.pyplot.pie is not implemented yet for ALPACA.')
+
 
 def plot(*args, scalex=True, scaley=True, data=None, **kwargs):
     # Format for string is {dictionary of settings}[[x axis], [y axis]]
     # xx_uc_byte = np.array(args[0], dtype=np.float).tobytes()
 
-    good_args = sum([isinstance(arg, (np.ndarray, list)) for arg in args])
+    good_args = _count_axes_in_args(args)
 
-    if good_args == 1:
-        xx_uc_byte = np.arange(len(args[0]), dtype=np.float).tobytes()
-        yy = args[0]
-    else:
-        xx_uc_byte = np.array(args[0], dtype=np.float).tobytes()
-        yy = args[1]
-
-    yy_uc_byte = np.array(yy, dtype=np.float)
-    yy_shape = yy_uc_byte.shape
-    yy_uc_byte = yy_uc_byte.tobytes()
-
-    if len(args) > 2: # add fmt string to kwargs if present:
+    if len(args) > 2:  # add fmt string to kwargs if present:
         kwargs['fmt'] = args[2]
     else:
         kwargs['fmt'] = ''
@@ -334,18 +348,90 @@ def plot(*args, scalex=True, scaley=True, data=None, **kwargs):
     kwargs['scaley'] = scaley
     kwargs['data'] = data
 
-    xx_hex_data = str(binascii.hexlify(xx_uc_byte), 'utf-8')
-    yy_hex_data = str(binascii.hexlify(yy_uc_byte), 'utf-8')
+    xx, yy = _get_x_and_y_from_args(args, good_args)
 
-    string = __PLOT_PREFIX+str(kwargs) + '[[' + xx_hex_data + '], [' + yy_hex_data + ']]' + str(yy_shape)
+    if len(xx) < 1000:
+        _send_small_plot(kwargs, xx, yy)
+    else:
+        yy_shape = yy.shape
+
+        data = list(_get_plot_data_as_hex(xx, yy))
+
+        print(__LONG_PLOT_PREFIX + str(kwargs) + '[[', end='')
+
+        stop = len(data[0])
+        for ii in range(2):  # Do X then Y
+            jj = 0
+            while True:
+                if stop - jj >= 1000:
+                    print(data[ii][jj:jj+1000], end='')
+                    jj += 1000
+                else:
+                    print(data[jj:], end='')
+                    break
+
+            if ii == 0:
+                print('], [', end='') # Spacer between X and Y
+
+        print(']]' + str(yy_shape) + __LONG_PLOT_SUFFIX)
+
+def _count_axes_in_args(args):
+    return sum([isinstance(arg, (np.ndarray, list)) for arg in args])
+
+
+def _get_x_and_y_from_args(args, good_args):
+    args = list(args)
+    if not isinstance(args[0], (list, np.ndarray, tuple)):
+        raise ValueError('x must be an array')
+
+    if good_args == 1:  # Just X specified
+        yy = np.array(args[0], dtype=np.float)
+        args[0] = None
+        xx = np.arange(len(yy), dtype=np.float)
+        del args
+    else:  # X and Y specified
+        if not isinstance(args[1], (list, np.ndarray, tuple)):
+            raise ValueError('y must be an array')
+        if len(args[0]) != len(args[1]):
+            raise ValueError('x and y must be the same size')
+
+
+        xx = np.array(args[0], dtype=np.float)
+        args[0] = None
+        yy = np.array(args[1], dtype=np.float)
+        del args
+
+    return xx, yy
+
+
+def _send_small_plot(kwargs, xx, yy):
+
+    yy_shape = yy.shape
+
+    xx_hex_data, yy_hex_data = _get_plot_data_as_hex(xx, yy)
+    string = __PLOT_PREFIX + str(kwargs) + '[[' + xx_hex_data + '], [' + yy_hex_data + ']]' + str(yy_shape)
     print(string)
-    return string
+
+
+def _get_plot_data_as_hex(xx, yy):
+    xx_uc_byte = xx.tobytes()
+    del xx
+    yy_uc_byte = yy.tobytes()
+    del yy
+    xx_hex_data = str(binascii.hexlify(xx_uc_byte), 'utf-8')
+    del xx_uc_byte
+    yy_hex_data = str(binascii.hexlify(yy_uc_byte), 'utf-8')
+    del yy_uc_byte
+    return xx_hex_data, yy_hex_data
+
 
 def scatter(*args, **kwargs):
     raise NotImplementedError('matplotlib.pyplot.scatter is not implemented yet for ALPACA.')
 
+
 def violinplot(*args, **kwargs):
     raise NotImplementedError('matplotlib.pyplot.violinplot is not implemented yet for ALPACA.')
+
 
 def vlines(
         x, ymin, ymax, colors=None, linestyles='solid', label='', *, data=None, **kwargs):
@@ -356,7 +442,8 @@ def vlines(
     kwargs['label'] = label
     kwargs['data'] = data
 
-    print(__ATTRIBUTE_PREFIX + 'vlines'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'vlines' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def title(label, fontdict=None, loc=None, pad=None, *, y=None, **kwargs):
     args = (label)
@@ -366,8 +453,7 @@ def title(label, fontdict=None, loc=None, pad=None, *, y=None, **kwargs):
     kwargs['pad'] = pad
     kwargs['y'] = y
 
-    print(__ATTRIBUTE_PREFIX + 'title'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
-
+    print(__ATTRIBUTE_PREFIX + 'title' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
 
 
 def xlabel(xlabel, fontdict=None, labelpad=None, *, loc=None, **kwargs):
@@ -377,7 +463,8 @@ def xlabel(xlabel, fontdict=None, labelpad=None, *, loc=None, **kwargs):
     kwargs['labelpad'] = labelpad
     kwargs['loc'] = loc
 
-    print(__ATTRIBUTE_PREFIX + 'xlabel'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'xlabel' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def ylabel(ylabel, fontdict=None, labelpad=None, *, loc=None, **kwargs):
     args = (ylabel)
@@ -386,14 +473,16 @@ def ylabel(ylabel, fontdict=None, labelpad=None, *, loc=None, **kwargs):
     kwargs['labelpad'] = labelpad
     kwargs['loc'] = loc
 
-    print(__ATTRIBUTE_PREFIX + 'ylabel'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'ylabel' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def xscale(value, **kwargs):
     args = (value)
 
-    print(__ATTRIBUTE_PREFIX + 'xscale'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')')
+    print(__ATTRIBUTE_PREFIX + 'xscale' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
+
 
 def yscale(value, **kwargs):
     args = (value)
 
-    print(__ATTRIBUTE_PREFIX + 'xscale'  + '(' + str(args).replace('(','').replace(')','') + ', '+ str(kwargs) +')') 
+    print(__ATTRIBUTE_PREFIX + 'xscale' + '(' + str(args).replace('(', '').replace(')', '') + ', ' + str(kwargs) + ')')
