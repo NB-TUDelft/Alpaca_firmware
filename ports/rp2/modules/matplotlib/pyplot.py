@@ -353,27 +353,28 @@ def plot(*args, scalex=True, scaley=True, data=None, **kwargs):
     if len(xx) < 1000:
         _send_small_plot(kwargs, xx, yy)
     else:
-        yy_shape = yy.shape
+        _send_large_plot(kwargs, xx, yy)
 
-        data = list(_get_plot_data_as_hex(xx, yy))
 
-        print(__LONG_PLOT_PREFIX + str(kwargs) + '[[', end='')
+def _send_large_plot(kwargs, xx, yy):
+    yy_shape = yy.shape
+    data = list(_get_plot_data_as_hex(xx, yy))
+    print(__LONG_PLOT_PREFIX + str(kwargs) + '[[', end='')
+    stop = len(data[0])
+    for ii in range(2):  # Do X then Y
+        jj = 0
+        while True:
+            if stop - jj >= 1000:
+                print(data[ii][jj:jj + 1000], end='')
+                jj += 1000
+            else:
+                print(data[jj:], end='')
+                break
 
-        stop = len(data[0])
-        for ii in range(2):  # Do X then Y
-            jj = 0
-            while True:
-                if stop - jj >= 1000:
-                    print(data[ii][jj:jj+1000], end='')
-                    jj += 1000
-                else:
-                    print(data[jj:], end='')
-                    break
+        if ii == 0:
+            print('], [', end='')  # Spacer between X and Y
+    print(']]' + str(yy_shape) + __LONG_PLOT_SUFFIX)
 
-            if ii == 0:
-                print('], [', end='') # Spacer between X and Y
-
-        print(']]' + str(yy_shape) + __LONG_PLOT_SUFFIX)
 
 def _count_axes_in_args(args):
     return sum([isinstance(arg, (np.ndarray, list)) for arg in args])
