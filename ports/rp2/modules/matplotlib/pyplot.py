@@ -339,7 +339,7 @@ def plot(*args, scalex=True, scaley=True, data=None, **kwargs):
 
     good_args = _count_axes_in_args(args)
 
-    if len(args) > 2:  # add fmt string to kwargs if present:
+    if len(args) - good_args > 0:  # add fmt string to kwargs if present:
         kwargs['fmt'] = args[2]
     else:
         kwargs['fmt'] = ''
@@ -348,12 +348,8 @@ def plot(*args, scalex=True, scaley=True, data=None, **kwargs):
     kwargs['scaley'] = scaley
     kwargs['data'] = data
 
-    xx, yy = _get_x_and_y_from_args(args, good_args)
+    _send_small_plot(kwargs, _get_x_and_y_from_args(args, good_args))
 
-    if len(xx) < 1000:
-        _send_small_plot(kwargs, xx, yy)
-    else:
-        _send_large_plot(kwargs, xx, yy)
 
 
 def _send_large_plot(kwargs, xx, yy):
@@ -386,44 +382,50 @@ def _get_x_and_y_from_args(args, good_args):
         raise ValueError('x must be an array')
 
     if good_args == 1:  # Just X specified
-        yy = np.array(args[0], dtype=np.float)
-        args[0] = None
-        xx = np.arange(len(yy), dtype=np.float)
-        del args
+        args[0] = np.array(args[0], dtype=_get_dtype_if_array(args[0]))
+        args = args[:1]
+        args.append(np.arange(len(args[0]), dtype=_get_dtype_if_array(args[0])))
+
     else:  # X and Y specified
         if not isinstance(args[1], (list, np.ndarray, tuple)):
             raise ValueError('y must be an array')
         if len(args[0]) != len(args[1]):
             raise ValueError('x and y must be the same size')
 
+        args[0] = np.array(args[0], dtype=_get_dtype_if_array(args[0]))
+        args[1] = np.array(args[1], dtype=_get_dtype_if_array(args[1]))
+        args = args[0:2]
 
-        xx = np.array(args[0], dtype=np.float)
-        args[0] = None
-        yy = np.array(args[1], dtype=np.float)
-        del args
-
-    return xx, yy
+    return args
 
 
-def _send_small_plot(kwargs, xx, yy):
+def _get_dtype_if_array(array):
+    if isinstance(array, np.ndarray):
+        yy_type = array.dtype
+    else:
+        yy_type = np.float
+    return yy_type
 
-    yy_shape = yy.shape
 
-    xx_hex_data, yy_hex_data = _get_plot_data_as_hex(xx, yy)
-    string = __PLOT_PREFIX + str(kwargs) + '[[' + xx_hex_data + '], [' + yy_hex_data + ']]' + str(yy_shape)
-    print(string)
+def _send_small_plot(kwargs, args):
+    try:
+        yy_shape = args[1].shape
 
+        string = '{}{}[[{}{}]]{}'.format(__PLOT_PREFIX, kwargs, *_get_plot_data_as_hex(args), yy_shape)
+        print(string)
+    except MemoryError as e:
+        raise MemoryError("It seems that the plot you requested is too big for the ALPACA. Try plotting a subset of "
+                          "the points. You might want to do this by slicing a numpy array every N points.") from e
 
-def _get_plot_data_as_hex(xx, yy):
-    xx_uc_byte = xx.tobytes()
-    del xx
-    yy_uc_byte = yy.tobytes()
-    del yy
-    xx_hex_data = str(binascii.hexlify(xx_uc_byte), 'utf-8')
-    del xx_uc_byte
-    yy_hex_data = str(binascii.hexlify(yy_uc_byte), 'utf-8')
-    del yy_uc_byte
-    return xx_hex_data, yy_hex_data
+def _get_plot_data_as_hex(args):
+    args[0] = args[0].tobytes()
+    args[1] = args[1].tobytes()
+
+    args[0] = str(binascii.hexlify(args[0]), 'utf-8')
+
+    args[1] = str(binascii.hexlify(args[1]), 'utf-8')
+
+    return args
 
 
 def scatter(*args, **kwargs):
