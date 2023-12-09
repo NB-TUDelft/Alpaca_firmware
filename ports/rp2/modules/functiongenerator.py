@@ -5,51 +5,51 @@ from machine import SPI, Pin
 
 # Max voltage the DAC is allowed to produce. Set to 3300 mV in
 # to protect against the DAC frying the Pico
-MAX_VOLTAGE_TOLERATED = const(3300)
+_MAX_VOLTAGE_TOLERATED = const(3300)
 
 # Max voltage the DAC can  produce.
 # Will be used in overdrive mode
-MAX_VOLTAGE_OVERDRIVE = const(4096)
+_MAX_VOLTAGE_OVERDRIVE = const(4096)
 
 # Minimum voltage allowed, set to zero for MCP4822
-MIN_VOLTAGE = const(0)
+_MIN_VOLTAGE = const(0)
 
-PIN_NO_MOSI = const(11)
-PIN_NO_SCK = const(10)
-PIN_NO_CS = const(13)
-PIN_NO_LDAC = const(12)
+_PIN_NO_MOSI = const(11)
+_PIN_NO_SCK = const(10)
+_PIN_NO_CS = const(13)
+_PIN_NO_LDAC = const(12)
 
 # Integer value, that when sent to the DAC over SPI will
 # produce the largest voltage. 4096 for the MCP4822
-DAC_MAX_INT = const(4096)
+_DAC_MAX_INT = const(4096)
 
 # Max voltage the DAC can produce measured in millivolts.
 # 4095 for the MCP4822 when the gain has been set to 2.
-DAC_MAX_VOLTAGE_GAIN_2 = const(4095)
+_DAC_MAX_VOLTAGE_GAIN_2 = const(4095)
 
 # Max voltage the DAC can produce measured in millivolts.
 # 4095 for the MCP4822 when the gain has been set to 2.
-DAC_MAX_VOLTAGE_GAIN_1 = const(2047)
+_DAC_MAX_VOLTAGE_GAIN_1 = const(2047)
 
 # 114 us write delay, whatever pause we want between
 # writes in our program has to be larger than this
-T_DAC_DELAY_US = const(73)
+_T_DAC_DELAY_US = const(73)
 
-SET_BYTE_A1 = const(12288)  # MCP4822 setting byte for DAC A, Gain 1
-SET_BYTE_A2 = const(4096)  # MCP4822 setting byte for DAC A, Gain 2
-SET_BYTE_B1 = const(45056)  # MCP4822 setting byte for DAC B, Gain 1
-SET_BYTE_B2 = const(36864)  # MCP4822 setting byte for DAC B, Gain 2
+_SET_BYTE_A1 = const(12288)  # MCP4822 setting byte for DAC A, Gain 1
+_SET_BYTE_A2 = const(4096)  # MCP4822 setting byte for DAC A, Gain 2
+_SET_BYTE_B1 = const(45056)  # MCP4822 setting byte for DAC B, Gain 1
+_SET_BYTE_B2 = const(36864)  # MCP4822 setting byte for DAC B, Gain 2
 
 # 'Safety factor' for calculating how many sample points
 # for DAC wave generation. Higher is rougher shapes.
-FUDGE_FACTOR = const(1)
+_FUDGE_FACTOR = const(1)
 
 # Max voltage array length
-N_STEP_MAX = const(300)
-N_STEP_MIN = const(16)
+_N_STEP_MAX = const(300)
+_N_STEP_MIN = const(16)
 
 # Max number for 16-bit integer
-MAX_NUM = const(65535)
+_MAX_NUM = const(65535)
 
 def is_number(xx, annotation='an input', strict=True):
     Number = (int, float)
@@ -60,15 +60,15 @@ def is_number(xx, annotation='an input', strict=True):
         return truth
 
 def get_N_step(ff):
-    return int(1E6 / T_DAC_DELAY_US / ff)
+    return int(1E6 / _T_DAC_DELAY_US / ff)
 
 
 def is_max(N_step):
-    return N_step > N_STEP_MAX
+    return N_step > _N_STEP_MAX
 
 
 def is_min(N_step):
-    return N_step <= N_STEP_MIN
+    return N_step <= _N_STEP_MIN
 
 @micropython.native
 def as_fraction(number: float, accuracy: float = 0.0001) -> (int, int):
@@ -95,7 +95,7 @@ class Waveform:
         self.v_max = Vmax
         self.freq = freq
         
-        self.array_period = MAX_NUM  # Used to calculate waveforms
+        self.array_period = _MAX_NUM  # Used to calculate waveforms
         
         self.unsafe = unsafe
         self.hold = False
@@ -159,21 +159,21 @@ class Waveform:
             is_number(freq, annotation='Frequency')
             
         # Sanity check for voltage bounds
-        if not unsafe and (V_max > MAX_VOLTAGE_TOLERATED):
+        if not unsafe and (V_max > _MAX_VOLTAGE_TOLERATED):
             pass
             # print(('WARNING:functiongenerator:Requested a peak maximum voltage of {} mV \n'
             #       '\tthat is too high for safe mode. To prevent clipping, turn off  \n'
             #        '\tsafe mode (not recommended) or request a voltage below {} mV'
             #        ).format(V_max, MAX_VOLTAGE_TOLERATED))
             
-        elif unsafe and (V_max > MAX_VOLTAGE_OVERDRIVE):
+        elif unsafe and (V_max > _MAX_VOLTAGE_OVERDRIVE):
             pass
             # print(('WARNING:functiongenerator:Requested a peak maximum voltage of {} mV \n'
             #       '\tthat is too high for the DAC. To prevent clipping, \n'
             #        '\tplease request a voltage below {} mV'
             #        ).format(V_max, MAX_VOLTAGE_OVERDRIVE))
             
-        elif V_min < MIN_VOLTAGE:
+        elif V_min < _MIN_VOLTAGE:
             pass
             # print(('WARNING:functiongenerator:Requested a peak minimum voltage of {} mV \n'
             #       '\tthat is too low for the DAC. To prevent clipping, \n'
@@ -185,11 +185,11 @@ class Waveform:
     @micropython.native
     def __clip_voltages(self, v_array):
         if self.unsafe:
-            v_max = MAX_VOLTAGE_OVERDRIVE
+            v_max = _MAX_VOLTAGE_OVERDRIVE
         else:
-            v_max = MAX_VOLTAGE_TOLERATED
+            v_max = _MAX_VOLTAGE_TOLERATED
             
-        v_min = MIN_VOLTAGE
+        v_min = _MIN_VOLTAGE
         
         v_array[v_array > v_max] = v_max
         v_array[v_array < v_min] = v_min
@@ -198,11 +198,11 @@ class Waveform:
 
     @micropython.native
     def __voltage_to_integer(self, voltages):
-        max_voltage = DAC_MAX_VOLTAGE_GAIN_2 if self.gain_2 else DAC_MAX_VOLTAGE_GAIN_1
+        max_voltage = _DAC_MAX_VOLTAGE_GAIN_2 if self.gain_2 else _DAC_MAX_VOLTAGE_GAIN_1
         
         # print('Gain 2 {}'.format('ON' if self.gain_2 else 'OFF'))
        
-        integers = np.array(voltages * DAC_MAX_INT / max_voltage, dtype=np.uint16)
+        integers = np.array(voltages * _DAC_MAX_INT / max_voltage, dtype=np.uint16)
         
         return integers
 
@@ -212,7 +212,7 @@ class Waveform:
             N_step = get_N_step(self.freq)
         
             if is_max(N_step):
-                N_step = N_STEP_MAX
+                N_step = _N_STEP_MAX
             elif is_min(N_step):
                 raise ValueError('Requested frequency is too high, '
                                  'try a frequency below {} Hz'.format(str(FREQ_MAX) ))
@@ -220,11 +220,11 @@ class Waveform:
             self.set_N_step(N_step)
     
             
-        tt = np.linspace(0, MAX_NUM - 1, self.N_step, dtype=np.uint16)
+        tt = np.linspace(0, _MAX_NUM - 1, self.N_step, dtype=np.uint16)
         voltages = self.eq(tt) # Use waveform equation
         voltages = self.__clip_voltages(voltages)
         
-        if self.v_max >= DAC_MAX_VOLTAGE_GAIN_1:
+        if self.v_max >= _DAC_MAX_VOLTAGE_GAIN_1:
             self.gain_2 = True
         else:
             self.gain_2 = False
@@ -352,11 +352,11 @@ def __setup_spi():
               phase=1,
               bits=8,
               firstbit=SPI.MSB,
-              sck=Pin(PIN_NO_SCK),
-              mosi=Pin(PIN_NO_MOSI),
+              sck=Pin(_PIN_NO_SCK),
+              mosi=Pin(_PIN_NO_MOSI),
               miso=None)
-    CS = Pin(PIN_NO_CS, Pin.OUT)
-    LDAC = Pin(PIN_NO_LDAC, Pin.OUT)
+    CS = Pin(_PIN_NO_CS, Pin.OUT)
+    LDAC = Pin(_PIN_NO_LDAC, Pin.OUT)
 
     return spi, CS, LDAC
 
@@ -375,7 +375,7 @@ def __function_generator_thread(wcr_array: bytearray, freq_mHz: int, N_steps: in
  
     # WRITE ------------------------
     delay_us = int(1e9 / freq_mHz / N_steps)  # delay in loop (in microseconds) necessary to generate wave
-    delay_us = delay_us - T_DAC_DELAY_US
+    delay_us = delay_us - _T_DAC_DELAY_US
     if delay_us < 0:
         delay_us = 0
 
@@ -496,13 +496,13 @@ class FuncGen:
     def __add_instr_to_wcr_array(self, wcr_array, dac_a=True, gain_2=False):
         ###############################
         if dac_a and not gain_2:
-            set_byte = SET_BYTE_A1
+            set_byte = _SET_BYTE_A1
         elif dac_a and gain_2:
-            set_byte = SET_BYTE_A2
+            set_byte = _SET_BYTE_A2
         elif not dac_a and not gain_2:
-            set_byte = SET_BYTE_B1
+            set_byte = _SET_BYTE_B1
         else:
-            set_byte = SET_BYTE_B2
+            set_byte = _SET_BYTE_B2
         ###############################
 
         set_byte_array = np.array((len(wcr_array) // 2) * [set_byte], dtype=np.uint16).byteswap().tobytes()
