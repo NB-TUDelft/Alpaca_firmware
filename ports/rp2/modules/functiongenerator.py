@@ -129,7 +129,7 @@ def _as_fraction(number: float, accuracy: float = 0.0001) -> (int, int):
 class Waveform:
 
     def __init__(self, Vpp=None, Vp=None, Vmin=None, Vmax=None, offset=0,
-                 freq=None, unsafe=False):
+                 freq=None, unsafe=False, hold=False):
         Vmin, Vmax, freq = self.__clean_input(Vpp, Vp, Vmin, Vmax, offset, freq,
                                               unsafe)
         self.v_min = Vmin
@@ -139,7 +139,7 @@ class Waveform:
         self.array_period = _MAX_NUM  # Used to calculate waveforms
 
         self.unsafe = unsafe
-        self.hold = False
+        self.hold = hold
 
         self.N_step = None
         self.gain_2 = False
@@ -490,10 +490,10 @@ class FuncGen:
 
         self.wcr_array = self.waveform.get_wcr_array()
 
-        dac_A = not DAC in ['B', 'b']
+        self.dac_A = not DAC in ['B', 'b']
 
         self.wcr_array = self.__add_instr_to_wcr_array(self.wcr_array,
-                                                       dac_A,
+                                                       self.dac_A,
                                                        self.waveform.gain_2)
 
     def __enter__(self):
@@ -512,6 +512,30 @@ class FuncGen:
         utime.sleep_ms(10)
 
         return None
+
+    def update(self, waveform: Waveform):
+
+        # Stop thread
+        global baton
+        global stop_flag
+
+        stop_flag = True
+
+        baton.acquire()  # Check if the other thread has stopped
+        baton.release()
+
+        # Update waveform
+        self.waveform = waveform
+
+        self.wcr_array = self.__add_instr_to_wcr_array(
+            self.waveform.get_wcr_array(),
+            self.dac_A,
+            self.waveform.gain_2)
+
+        # Go again
+        stop_flag = False
+        self.__enter__()
+
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         """Stop the function generator on the Alpaca.
