@@ -129,8 +129,8 @@ def _as_fraction(number: float, accuracy: float = 0.0001) -> (int, int):
 class Waveform:
 
     def __init__(self, Vpp=None, Vp=None, Vmin=None, Vmax=None, offset=0,
-                 freq=None, unsafe=False, hold=False):
-        Vmin, Vmax, freq = self.__clean_input(Vpp, Vp, Vmin, Vmax, offset, freq,
+                 freq=None, period=None, unsafe=False, hold=False):
+        Vmin, Vmax, freq = self.__clean_input(Vpp, Vp, Vmin, Vmax, offset, freq, period,
                                               unsafe)
         self.v_min = Vmin
         self.v_max = Vmax
@@ -158,7 +158,7 @@ class Waveform:
         return self.__create_wcr_array()
 
     @staticmethod
-    def __clean_input(V_PP, V_P, V_min, V_max, offset, freq, unsafe):
+    def __clean_input(V_PP, V_P, V_min, V_max, offset, freq, period, unsafe):
 
         has_vpp_input: bool = (V_PP is not None) or (V_P is not None)
         has_minmax_input: bool = (V_min is not None) and (V_max is not None)
@@ -193,11 +193,14 @@ class Waveform:
         V_min = int(V_min * 1_000)
 
         # Sanity check for frequency
-        if freq is None:
+        if freq is None and period is None:
             raise ValueError('Expected a keyword "freq" specifying '
-                             'the frequency of the waveform')
-        else:
-            _is_number(freq, annotation='Frequency')
+                             'the frequency of the waveform or a keyword '
+                             '"period" specifying the period.')
+        if freq is None:
+            freq = 1 / period
+
+        _is_number(freq, annotation='Frequency')
 
         # Sanity check for voltage bounds
         if not unsafe and (V_max > _MAX_VOLTAGE_TOLERATED):
@@ -388,6 +391,22 @@ class Square(Waveform):
                 [self.v_min] * self.fraction[0] + [self.v_max] * self.fraction[
                     1])
 
+class Arbitrary(Waveform):
+
+    def __init__(self, voltages, freq: float = None, period: float = None,
+                 unsafe=False, hold=False):
+
+        super().__init__(Vmax=1, Vmin=0, freq=freq,
+                         period=period, unsafe=unsafe, hold=hold)
+        self.voltages = voltages
+        self.N_step = len(voltages)  # Floating N
+        self.equation = [self.eq]
+
+    # Really hacky but let's go with it
+    def eq(self, tt):
+        return np.array(self.voltages) * 1000 # V to mV
+
+
 
 #######################################################################
 
@@ -511,7 +530,7 @@ class FuncGen:
 
         utime.sleep_ms(10)
 
-        return None
+        return self
 
     def update(self, waveform: Waveform):
 
@@ -598,3 +617,4 @@ class FuncGen:
 
 if __name__ == '__main__':
     pass
+
