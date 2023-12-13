@@ -44,6 +44,9 @@ _SET_BYTE_B2 = const(36864)  # MCP4822 setting byte for DAC B, Gain 2
 # for DAC wave generation. Higher is rougher shapes.
 _FUDGE_FACTOR = const(1)
 
+_VOLTAGE_CALIB_FACTOR = 0.8948
+
+
 # Max voltage array length
 _N_STEP_MAX = const(300)
 _N_STEP_MIN = const(16)
@@ -246,7 +249,10 @@ class Waveform:
 
         # print('Gain 2 {}'.format('ON' if self.gain_2 else 'OFF'))
 
-        integers = np.array(voltages * _DAC_MAX_INT / max_voltage,
+        integers = np.array(voltages
+                            * _DAC_MAX_INT
+                            * _VOLTAGE_CALIB_FACTOR
+                            / max_voltage,
                             dtype=np.uint16)
 
         return integers
@@ -410,7 +416,7 @@ class Arbitrary(Waveform):
 
 #######################################################################
 
-def __setup_spi():
+def _setup_spi():
     # returns SPI objects. Used to so objects can be kept locally rather than globally.
     # Rationale: Local objects can be operated upon more quickly in MicroPython
     spi = SPI(1,
@@ -439,7 +445,7 @@ def __function_generator_thread(wcr_array: bytearray, freq_mHz: int,
     LED.value(True)
     baton.acquire()
 
-    spi, CS, LDAC = __setup_spi()
+    spi, CS, LDAC = _setup_spi()
 
     # WRITE ------------------------
     delay_us = int(
@@ -492,6 +498,28 @@ def __function_generator_thread(wcr_array: bytearray, freq_mHz: int,
     return
 
 
+def _add_instr_to_wcr_array(wcr_array, dac_a=True, gain_2=False):
+    ###############################
+    if dac_a and not gain_2:
+        set_byte = _SET_BYTE_A1
+    elif dac_a and gain_2:
+        set_byte = _SET_BYTE_A2
+    elif not dac_a and not gain_2:
+        set_byte = _SET_BYTE_B1
+    else:
+        set_byte = _SET_BYTE_B2
+    ###############################
+
+    set_byte_array = np.array((len(wcr_array) // 2) * [set_byte],
+                              dtype=np.uint16).byteswap().tobytes()
+
+    new_wcr_array = bytearray((int.from_bytes(wcr_array, 'big')
+                               | int.from_bytes(set_byte_array, 'big')
+                               ).to_bytes(len(wcr_array), 'big'))
+
+    return new_wcr_array
+
+
 class FuncGen:
     def __init__(self, waveform: Waveform, DAC: str = 'A',
                  unsafe: bool = False):
@@ -511,7 +539,7 @@ class FuncGen:
 
         self.dac_A = not DAC in ['B', 'b']
 
-        self.wcr_array = self.__add_instr_to_wcr_array(self.wcr_array,
+        self.wcr_array = _add_instr_to_wcr_array(self.wcr_array,
                                                        self.dac_A,
                                                        self.waveform.gain_2)
 
@@ -546,7 +574,7 @@ class FuncGen:
         # Update waveform
         self.waveform = waveform
 
-        self.wcr_array = self.__add_instr_to_wcr_array(
+        self.wcr_array = _add_instr_to_wcr_array(
             self.waveform.get_wcr_array(),
             self.dac_A,
             self.waveform.gain_2)
@@ -574,7 +602,7 @@ class FuncGen:
         baton.release()
 
         if not self.waveform.hold:
-            spi, CS, LDAC = __setup_spi()
+            spi, CS, LDAC = _setup_spi()
 
             CS.value(True)
             LDAC.value(False)
@@ -587,27 +615,6 @@ class FuncGen:
             spi.write(b'\x01\x00')  # Shudown DAC A
             CS.value(True)
 
-    def __add_instr_to_wcr_array(self, wcr_array, dac_a=True, gain_2=False):
-        ###############################
-        if dac_a and not gain_2:
-            set_byte = _SET_BYTE_A1
-        elif dac_a and gain_2:
-            set_byte = _SET_BYTE_A2
-        elif not dac_a and not gain_2:
-            set_byte = _SET_BYTE_B1
-        else:
-            set_byte = _SET_BYTE_B2
-        ###############################
-
-        set_byte_array = np.array((len(wcr_array) // 2) * [set_byte],
-                                  dtype=np.uint16).byteswap().tobytes()
-
-        new_wcr_array = bytearray((int.from_bytes(wcr_array, 'big')
-                                   | int.from_bytes(set_byte_array, 'big')
-                                   ).to_bytes(len(wcr_array), 'big'))
-
-        return new_wcr_array
-
     def __graceful_exit(self):
         # """Method to shut down the function generator gracefully. This prevents 'core 1 in use' errors.
         # """
@@ -617,4 +624,6 @@ class FuncGen:
 
 if __name__ == '__main__':
     pass
+
+
 
