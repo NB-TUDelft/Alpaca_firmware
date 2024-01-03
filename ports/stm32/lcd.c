@@ -89,10 +89,10 @@ typedef struct _pyb_lcd_obj_t {
 
     // hardware control for the LCD
     const spi_t *spi;
-    const pin_obj_t *pin_cs1;
-    const pin_obj_t *pin_rst;
-    const pin_obj_t *pin_a0;
-    const pin_obj_t *pin_bl;
+    const machine_pin_obj_t *pin_cs1;
+    const machine_pin_obj_t *pin_rst;
+    const machine_pin_obj_t *pin_a0;
+    const machine_pin_obj_t *pin_bl;
 
     // character buffer for stdout-like output
     char char_buffer[LCD_CHAR_BUF_W * LCD_CHAR_BUF_H];
@@ -525,11 +525,12 @@ STATIC const mp_rom_map_elem_t pyb_lcd_locals_dict_table[] = {
 
 STATIC MP_DEFINE_CONST_DICT(pyb_lcd_locals_dict, pyb_lcd_locals_dict_table);
 
-const mp_obj_type_t pyb_lcd_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_LCD,
-    .make_new = pyb_lcd_make_new,
-    .locals_dict = (mp_obj_dict_t *)&pyb_lcd_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    pyb_lcd_type,
+    MP_QSTR_LCD,
+    MP_TYPE_FLAG_NONE,
+    make_new, pyb_lcd_make_new,
+    locals_dict, &pyb_lcd_locals_dict
+    );
 
 #endif // MICROPY_HW_HAS_LCD

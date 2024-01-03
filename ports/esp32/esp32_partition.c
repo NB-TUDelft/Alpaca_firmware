@@ -200,7 +200,7 @@ STATIC mp_obj_t esp32_partition_writeblocks(size_t n_args, const mp_obj_t *args)
                     check_esp_err(esp_partition_write(self->part, addr, self->cache, o));
                 }
                 if (top_addr < addr + NATIVE_BLOCK_SIZE_BYTES) {
-                    check_esp_err(esp_partition_write(self->part, top_addr, self->cache, addr + NATIVE_BLOCK_SIZE_BYTES - top_addr));
+                    check_esp_err(esp_partition_write(self->part, top_addr, self->cache + (top_addr - addr), addr + NATIVE_BLOCK_SIZE_BYTES - top_addr));
                 }
                 o = 0;
                 addr += NATIVE_BLOCK_SIZE_BYTES;
@@ -284,10 +284,11 @@ STATIC const mp_rom_map_elem_t esp32_partition_locals_dict_table[] = {
 };
 STATIC MP_DEFINE_CONST_DICT(esp32_partition_locals_dict, esp32_partition_locals_dict_table);
 
-const mp_obj_type_t esp32_partition_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_Partition,
-    .print = esp32_partition_print,
-    .make_new = esp32_partition_make_new,
-    .locals_dict = (mp_obj_dict_t *)&esp32_partition_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    esp32_partition_type,
+    MP_QSTR_Partition,
+    MP_TYPE_FLAG_NONE,
+    make_new, esp32_partition_make_new,
+    print, esp32_partition_print,
+    locals_dict, &esp32_partition_locals_dict
+    );

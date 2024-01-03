@@ -96,13 +96,6 @@ STATIC mp_uint_t file_obj_write(mp_obj_t self_in, const void *buf, mp_uint_t siz
     return sz_out;
 }
 
-
-STATIC mp_obj_t file_obj___exit__(size_t n_args, const mp_obj_t *args) {
-    (void)n_args;
-    return mp_stream_close(args[0]);
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(file_obj___exit___obj, 4, 4, file_obj___exit__);
-
 STATIC mp_uint_t file_obj_ioctl(mp_obj_t o_in, mp_uint_t request, uintptr_t arg, int *errcode) {
     pyb_file_obj_t *self = MP_OBJ_TO_PTR(o_in);
 
@@ -165,28 +158,25 @@ STATIC const mp_rom_map_elem_t vfs_fat_rawfile_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_tell), MP_ROM_PTR(&mp_stream_tell_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&mp_stream_close_obj) },
     { MP_ROM_QSTR(MP_QSTR___enter__), MP_ROM_PTR(&mp_identity_obj) },
-    { MP_ROM_QSTR(MP_QSTR___exit__), MP_ROM_PTR(&file_obj___exit___obj) },
+    { MP_ROM_QSTR(MP_QSTR___exit__), MP_ROM_PTR(&mp_stream___exit___obj) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(vfs_fat_rawfile_locals_dict, vfs_fat_rawfile_locals_dict_table);
 
-#if MICROPY_PY_IO_FILEIO
 STATIC const mp_stream_p_t vfs_fat_fileio_stream_p = {
     .read = file_obj_read,
     .write = file_obj_write,
     .ioctl = file_obj_ioctl,
 };
 
-const mp_obj_type_t mp_type_vfs_fat_fileio = {
-    { &mp_type_type },
-    .name = MP_QSTR_FileIO,
-    .print = file_obj_print,
-    .getiter = mp_identity_getiter,
-    .iternext = mp_stream_unbuffered_iter,
-    .protocol = &vfs_fat_fileio_stream_p,
-    .locals_dict = (mp_obj_dict_t *)&vfs_fat_rawfile_locals_dict,
-};
-#endif
+MP_DEFINE_CONST_OBJ_TYPE(
+    mp_type_vfs_fat_fileio,
+    MP_QSTR_FileIO,
+    MP_TYPE_FLAG_ITER_IS_STREAM,
+    print, file_obj_print,
+    protocol, &vfs_fat_fileio_stream_p,
+    locals_dict, &vfs_fat_rawfile_locals_dict
+    );
 
 STATIC const mp_stream_p_t vfs_fat_textio_stream_p = {
     .read = file_obj_read,
@@ -195,15 +185,14 @@ STATIC const mp_stream_p_t vfs_fat_textio_stream_p = {
     .is_text = true,
 };
 
-const mp_obj_type_t mp_type_vfs_fat_textio = {
-    { &mp_type_type },
-    .name = MP_QSTR_TextIOWrapper,
-    .print = file_obj_print,
-    .getiter = mp_identity_getiter,
-    .iternext = mp_stream_unbuffered_iter,
-    .protocol = &vfs_fat_textio_stream_p,
-    .locals_dict = (mp_obj_dict_t *)&vfs_fat_rawfile_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    mp_type_vfs_fat_textio,
+    MP_QSTR_TextIOWrapper,
+    MP_TYPE_FLAG_ITER_IS_STREAM,
+    print, file_obj_print,
+    protocol, &vfs_fat_textio_stream_p,
+    locals_dict, &vfs_fat_rawfile_locals_dict
+    );
 
 // Factory function for I/O stream classes
 STATIC mp_obj_t fat_vfs_open(mp_obj_t self_in, mp_obj_t path_in, mp_obj_t mode_in) {
@@ -230,11 +219,9 @@ STATIC mp_obj_t fat_vfs_open(mp_obj_t self_in, mp_obj_t path_in, mp_obj_t mode_i
             case '+':
                 mode |= FA_READ | FA_WRITE;
                 break;
-            #if MICROPY_PY_IO_FILEIO
             case 'b':
                 type = &mp_type_vfs_fat_fileio;
                 break;
-            #endif
             case 't':
                 type = &mp_type_vfs_fat_textio;
                 break;

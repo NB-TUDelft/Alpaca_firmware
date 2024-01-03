@@ -65,7 +65,7 @@
 #endif
 
 // Python internal features
-#define MICROPY_TRACKED_ALLOC       (MICROPY_SSL_MBEDTLS)
+#define MICROPY_TRACKED_ALLOC       (MICROPY_SSL_MBEDTLS || MICROPY_BLUETOOTH_BTSTACK)
 #define MICROPY_READER_VFS          (1)
 #define MICROPY_ENABLE_GC           (1)
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF (1)
@@ -92,56 +92,66 @@
 #endif
 
 // extended modules
-#define MICROPY_PY_USSL_FINALISER   (MICROPY_PY_USSL)
-#define MICROPY_PY_UHASHLIB_MD5     (MICROPY_PY_USSL)
-#define MICROPY_PY_UHASHLIB_SHA1    (MICROPY_PY_USSL)
-#define MICROPY_PY_UCRYPTOLIB       (MICROPY_PY_USSL)
-#define MICROPY_PY_UOS_INCLUDEFILE  "ports/stm32/moduos.c"
+#define MICROPY_PY_HASHLIB_MD5      (MICROPY_PY_SSL)
+#define MICROPY_PY_HASHLIB_SHA1     (MICROPY_PY_SSL)
+#define MICROPY_PY_CRYPTOLIB        (MICROPY_PY_SSL)
+#define MICROPY_PY_OS_INCLUDEFILE   "ports/stm32/modos.c"
 #define MICROPY_PY_OS_DUPTERM       (3)
-#define MICROPY_PY_UOS_DUPTERM_BUILTIN_STREAM (1)
-#define MICROPY_PY_UOS_DUPTERM_STREAM_DETACHED_ATTACHED (1)
-#define MICROPY_PY_UOS_SEP          (1)
-#define MICROPY_PY_UOS_SYNC         (1)
-#define MICROPY_PY_UOS_UNAME        (1)
-#define MICROPY_PY_UOS_URANDOM      (MICROPY_HW_ENABLE_RNG)
-#define MICROPY_PY_URANDOM_SEED_INIT_FUNC (rng_get())
-#ifndef MICROPY_PY_UTIME
-#define MICROPY_PY_UTIME            (1)
-#endif
-#define MICROPY_PY_UTIME_MP_HAL     (MICROPY_PY_UTIME)
-#ifndef MICROPY_PY_UTIMEQ
-#define MICROPY_PY_UTIMEQ           (1)
-#endif
+#define MICROPY_PY_OS_DUPTERM_BUILTIN_STREAM (1)
+#define MICROPY_PY_OS_DUPTERM_STREAM_DETACHED_ATTACHED (1)
+#define MICROPY_PY_OS_SEP           (1)
+#define MICROPY_PY_OS_SYNC          (1)
+#define MICROPY_PY_OS_UNAME         (1)
+#define MICROPY_PY_OS_URANDOM       (MICROPY_HW_ENABLE_RNG)
+#define MICROPY_PY_RANDOM_SEED_INIT_FUNC (rng_get())
+#define MICROPY_PY_TIME_GMTIME_LOCALTIME_MKTIME (1)
+#define MICROPY_PY_TIME_TIME_TIME_NS (1)
+#define MICROPY_PY_TIME_INCLUDEFILE "ports/stm32/modtime.c"
 #define MICROPY_PY_LWIP_SOCK_RAW    (MICROPY_PY_LWIP)
 #ifndef MICROPY_PY_MACHINE
 #define MICROPY_PY_MACHINE          (1)
+#define MICROPY_PY_MACHINE_INCLUDEFILE "ports/stm32/modmachine.c"
+#define MICROPY_PY_MACHINE_BARE_METAL_FUNCS (1)
+#define MICROPY_PY_MACHINE_BOOTLOADER (1)
+#define MICROPY_PY_MACHINE_ADC      (1)
+#define MICROPY_PY_MACHINE_ADC_INCLUDEFILE "ports/stm32/machine_adc.c"
 #ifndef MICROPY_PY_MACHINE_BITSTREAM
 #define MICROPY_PY_MACHINE_BITSTREAM (1)
 #endif
+#define MICROPY_PY_MACHINE_DHT_READINTO (1)
 #define MICROPY_PY_MACHINE_PULSE    (1)
 #define MICROPY_PY_MACHINE_PIN_MAKE_NEW mp_pin_make_new
-#define MICROPY_PY_MACHINE_I2C      (1)
+#define MICROPY_PY_MACHINE_I2C      (MICROPY_HW_ENABLE_HW_I2C)
 #define MICROPY_PY_MACHINE_SOFTI2C  (1)
+#define MICROPY_PY_MACHINE_I2S_INCLUDEFILE "ports/stm32/machine_i2s.c"
+#define MICROPY_PY_MACHINE_I2S_CONSTANT_RX (I2S_MODE_MASTER_RX)
+#define MICROPY_PY_MACHINE_I2S_CONSTANT_TX (I2S_MODE_MASTER_TX)
+#define MICROPY_PY_MACHINE_I2S_RING_BUF (1)
 #define MICROPY_PY_MACHINE_SPI      (1)
 #define MICROPY_PY_MACHINE_SPI_MSB  (SPI_FIRSTBIT_MSB)
 #define MICROPY_PY_MACHINE_SPI_LSB  (SPI_FIRSTBIT_LSB)
 #define MICROPY_PY_MACHINE_SOFTSPI  (1)
+#define MICROPY_PY_MACHINE_TIMER    (1)
+#define MICROPY_PY_MACHINE_UART     (1)
+#define MICROPY_PY_MACHINE_UART_INCLUDEFILE "ports/stm32/machine_uart.c"
+#define MICROPY_PY_MACHINE_UART_IRQ (1)
+#define MICROPY_PY_MACHINE_UART_READCHAR_WRITECHAR (1)
+#define MICROPY_PY_MACHINE_UART_SENDBREAK (1)
+#define MICROPY_PY_MACHINE_WDT      (1)
+#define MICROPY_PY_MACHINE_WDT_INCLUDEFILE "ports/stm32/machine_wdt.c"
 #endif
 #define MICROPY_HW_SOFTSPI_MIN_DELAY (0)
 #define MICROPY_HW_SOFTSPI_MAX_BAUDRATE (HAL_RCC_GetSysClockFreq() / 48)
-#define MICROPY_PY_UWEBSOCKET       (MICROPY_PY_LWIP)
+#define MICROPY_PY_WEBSOCKET        (MICROPY_PY_LWIP)
 #define MICROPY_PY_WEBREPL          (MICROPY_PY_LWIP)
-#ifndef MICROPY_PY_USOCKET
-#define MICROPY_PY_USOCKET          (1)
+#ifndef MICROPY_PY_SOCKET
+#define MICROPY_PY_SOCKET           (1)
 #endif
 #ifndef MICROPY_PY_NETWORK
 #define MICROPY_PY_NETWORK          (1)
 #endif
 #ifndef MICROPY_PY_ONEWIRE
 #define MICROPY_PY_ONEWIRE          (1)
-#endif
-#ifndef MICROPY_PY_UPLATFORM
-#define MICROPY_PY_UPLATFORM        (1)
 #endif
 
 // fatfs configuration used in ffconf.h
@@ -169,7 +179,6 @@ extern const struct _mp_obj_module_t stm_module;
 
 #if MICROPY_PY_MACHINE
 #define MACHINE_BUILTIN_MODULE_CONSTANTS \
-    { MP_ROM_QSTR(MP_QSTR_umachine), MP_ROM_PTR(&mp_module_machine) }, \
     { MP_ROM_QSTR(MP_QSTR_machine), MP_ROM_PTR(&mp_module_machine) },
 #else
 #define MACHINE_BUILTIN_MODULE_CONSTANTS
@@ -190,21 +199,10 @@ extern const struct _mp_obj_type_t mp_network_cyw43_type;
 #endif
 
 #if MICROPY_PY_NETWORK_WIZNET5K
-#if MICROPY_PY_LWIP
 extern const struct _mp_obj_type_t mod_network_nic_type_wiznet5k;
-#else
-extern const struct _mod_network_nic_type_t mod_network_nic_type_wiznet5k;
-#endif
 #define MICROPY_HW_NIC_WIZNET5K             { MP_ROM_QSTR(MP_QSTR_WIZNET5K), MP_ROM_PTR(&mod_network_nic_type_wiznet5k) },
 #else
 #define MICROPY_HW_NIC_WIZNET5K
-#endif
-
-#if MICROPY_PY_CC3K
-extern const struct _mod_network_nic_type_t mod_network_nic_type_cc3k;
-#define MICROPY_HW_NIC_CC3K                 { MP_ROM_QSTR(MP_QSTR_CC3K), MP_ROM_PTR(&mod_network_nic_type_cc3k) },
-#else
-#define MICROPY_HW_NIC_CC3K
 #endif
 
 // extra constants
@@ -221,7 +219,6 @@ extern const struct _mod_network_nic_type_t mod_network_nic_type_cc3k;
     MICROPY_HW_NIC_ETH  \
     MICROPY_HW_NIC_CYW43 \
     MICROPY_HW_NIC_WIZNET5K \
-    MICROPY_HW_NIC_CC3K \
     MICROPY_BOARD_NETWORK_INTERFACES \
 
 #define MP_STATE_PORT MP_STATE_VM
@@ -241,27 +238,6 @@ typedef unsigned int mp_uint_t; // must be pointer size
 #endif
 
 typedef long mp_off_t;
-
-// We have inlined IRQ functions for efficiency (they are generally
-// 1 machine instruction).
-//
-// Note on IRQ state: you should not need to know the specific
-// value of the state variable, but rather just pass the return
-// value from disable_irq back to enable_irq.  If you really need
-// to know the machine-specific values, see irq.h.
-
-static inline void enable_irq(mp_uint_t state) {
-    __set_PRIMASK(state);
-}
-
-static inline mp_uint_t disable_irq(void) {
-    mp_uint_t state = __get_PRIMASK();
-    __disable_irq();
-    return state;
-}
-
-#define MICROPY_BEGIN_ATOMIC_SECTION()     disable_irq()
-#define MICROPY_END_ATOMIC_SECTION(state)  enable_irq(state)
 
 #if MICROPY_PY_THREAD
 #define MICROPY_EVENT_POLL_HOOK \
@@ -289,16 +265,17 @@ static inline mp_uint_t disable_irq(void) {
 #define MICROPY_THREAD_YIELD()
 #endif
 
-// For regular code that wants to prevent "background tasks" from running.
-// These background tasks (LWIP, Bluetooth) run in PENDSV context.
-#define MICROPY_PY_PENDSV_ENTER   uint32_t atomic_state = raise_irq_pri(IRQ_PRI_PENDSV);
-#define MICROPY_PY_PENDSV_REENTER atomic_state = raise_irq_pri(IRQ_PRI_PENDSV);
-#define MICROPY_PY_PENDSV_EXIT    restore_irq_pri(atomic_state);
+// Configuration for shared/runtime/softtimer.c.
+#define MICROPY_SOFT_TIMER_TICKS_MS uwTick
 
 // Prevent the "LWIP task" from running.
 #define MICROPY_PY_LWIP_ENTER   MICROPY_PY_PENDSV_ENTER
 #define MICROPY_PY_LWIP_REENTER MICROPY_PY_PENDSV_REENTER
 #define MICROPY_PY_LWIP_EXIT    MICROPY_PY_PENDSV_EXIT
+
+#ifndef MICROPY_PY_NETWORK_HOSTNAME_DEFAULT
+#define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT "mpy-stm32"
+#endif
 
 #if MICROPY_PY_BLUETOOTH_USE_SYNC_EVENTS
 // Bluetooth code only runs in the scheduler, no locking/mutex required.
@@ -317,11 +294,19 @@ static inline mp_uint_t disable_irq(void) {
 #define MICROPY_PY_BLUETOOTH_HCI_READ_MODE MICROPY_PY_BLUETOOTH_HCI_READ_MODE_BYTE
 #endif
 
+#ifndef MICROPY_PY_BLUETOOTH_ENABLE_CENTRAL_MODE
+#define MICROPY_PY_BLUETOOTH_ENABLE_CENTRAL_MODE (1)
+#endif
+
+#ifndef MICROPY_PY_BLUETOOTH_ENABLE_L2CAP_CHANNELS
+#define MICROPY_PY_BLUETOOTH_ENABLE_L2CAP_CHANNELS (MICROPY_BLUETOOTH_NIMBLE)
+#endif
+
 // We need an implementation of the log2 function which is not a macro
 #define MP_NEED_LOG2 (1)
 
 // We need to provide a declaration/definition of alloca()
 #include <alloca.h>
 
-// Needed for MICROPY_PY_URANDOM_SEED_INIT_FUNC.
+// Needed for MICROPY_PY_RANDOM_SEED_INIT_FUNC.
 uint32_t rng_get(void);
