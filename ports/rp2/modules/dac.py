@@ -1,4 +1,4 @@
-from functiongeneratortwo import DC, _add_instr_to_wcr_array, _setup_spi
+from functiongenerator import DC, _add_instr_to_wcr_array, _setup_spi
 
 
 class DAC:
@@ -37,5 +37,3 @@ class DAC:
 
 if __name__ == '__main__':
     pass
-
-
