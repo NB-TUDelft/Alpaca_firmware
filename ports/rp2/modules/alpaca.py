@@ -7,7 +7,7 @@
 #    /  /_\  \   |  |     |   ___/  /  /_\  \  |  |      /  /_\  \
 #   /  _____  \  |  `----.|  |     /  _____  \ |  `----./  _____  \
 #  /__/     \__\ |_______|| _|    /__/     \__\ \______/__/     \__\
-version = '0.7'  # Module version so students can retrieve their version for debugging
+version = '0.8'  # Module version so students can retrieve their version for debugging
 
 
 def get_version():

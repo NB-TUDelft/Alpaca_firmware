@@ -521,7 +521,7 @@ def _add_instr_to_wcr_array(wcr_array, dac_a=True, gain_2=False):
 
 
 class FuncGen:
-    def __init__(self, waveform: Waveform, DAC: str = 'A',
+    def __init__(self, waveform: Waveform, channel: str = 'A',
                  unsafe: bool = False):
         """Construct an instance of the Function Generator class.
         """
@@ -537,7 +537,7 @@ class FuncGen:
 
         self.wcr_array = self.waveform.get_wcr_array()
 
-        self.dac_A = not DAC in ['B', 'b']
+        self.dac_A = not channel in ['B', 'b']
 
         self.wcr_array = _add_instr_to_wcr_array(self.wcr_array,
                                                        self.dac_A,
@@ -624,6 +624,3 @@ class FuncGen:
 
 if __name__ == '__main__':
     pass
-
-
-

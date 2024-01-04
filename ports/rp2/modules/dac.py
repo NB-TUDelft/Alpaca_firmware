@@ -4,7 +4,7 @@ from functiongenerator import DC, _add_instr_to_wcr_array, _setup_spi
 class DAC:
 
     def __init__(self, channel: str = 'A'):
-        self.dac_A = not DAC in ['B', 'b']
+        self.dac_A = not channel in ['B', 'b']
 
     def write(self, voltage):
         waveform = DC(voltage)
