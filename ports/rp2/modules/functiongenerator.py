@@ -48,7 +48,7 @@ _VOLTAGE_CALIB_FACTOR = 0.8948
 
 
 # Max voltage array length
-_N_STEP_MAX = const(300)
+_N_STEP_MAX = const(4096)
 _N_STEP_MIN = const(16)
 
 # Max number for 16-bit integer
