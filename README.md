@@ -94,3 +94,45 @@ Before compiling a given port, use
     $ make submodules
 
 to ensure that all required submodules are initialised.
+
+
+Building from source
+--------------------
+
+To build the RP2040 MicroPython port, you’ll need to install some extra tools. To build projects you’ll need CMake, a
+cross-platform tool used to build the software, and the GNU Embedded Toolchain for Arm, which turns MicroPython’s C
+source code into a binary program RP2040’s processors can understand. `build-essential` is a bundle of tools you need
+to build code native to your own machine — this is needed for some internal tools in MicroPython and the SDK. You can
+install all of these via `apt` from the command line. Anything you already have installed will be ignored by `apt`
+
+```bash
+git clone https://github.com/twhoekstra/nb2211-micropython.git
+cd nb2211-micropython/
+```
+
+The MicroPython repository also contains pointers (submodules) to specific 
+versions of libraries it needs to run on a
+particular board, like the SDK in the case of RP2040. We need to fetch these submodules too
+
+```bash
+make -C ports/rp2 submodules
+```
+
+Fetch ulab submodule.
+```bash
+git submodule update --init lib/ulab
+```
+
+First we need to bootstrap a special tool for MicroPython builds, that ships with the source code:
+
+```bash
+make -C mpy-cross
+```
+
+We can now build the port we need for RP2040, that is, the version of MicroPython that has specific support for our
+chip.
+
+```bash
+cd ports/rp2
+make USER_C_MODULES=../../lib/ulab/code/micropython.cmake
+```
