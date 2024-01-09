@@ -350,28 +350,6 @@ def plot(*args, scalex=True, scaley=True, data=None, **kwargs):
 
     _send_small_plot(kwargs, _get_x_and_y_from_args(args, good_args))
 
-
-
-def _send_large_plot(kwargs, xx, yy):
-    yy_shape = yy.shape
-    data = list(_get_plot_data_as_hex(xx, yy))
-    print(__LONG_PLOT_PREFIX + str(kwargs) + '[[', end='')
-    stop = len(data[0])
-    for ii in range(2):  # Do X then Y
-        jj = 0
-        while True:
-            if stop - jj >= 1000:
-                print(data[ii][jj:jj + 1000], end='')
-                jj += 1000
-            else:
-                print(data[jj:], end='')
-                break
-
-        if ii == 0:
-            print('], [', end='')  # Spacer between X and Y
-    print(']]' + str(yy_shape) + __LONG_PLOT_SUFFIX)
-
-
 def _count_axes_in_args(args):
     return sum([isinstance(arg, (np.ndarray, list)) for arg in args])
 
@@ -411,11 +389,12 @@ def _send_small_plot(kwargs, args):
     try:
         yy_shape = args[1].shape
 
-        string = '{}{}[[{}{}]]{}'.format(__PLOT_PREFIX, kwargs, *_get_plot_data_as_hex(args), yy_shape)
+        string = '{}{}[[{}], [{}]]{}'.format(__PLOT_PREFIX, kwargs, *_get_plot_data_as_hex(args), yy_shape)
         print(string)
     except MemoryError as e:
         raise MemoryError("It seems that the plot you requested is too big for the ALPACA. Try plotting a subset of "
                           "the points. You might want to do this by slicing a numpy array every N points.") from e
+
 
 def _get_plot_data_as_hex(args):
     args[0] = args[0].tobytes()
