@@ -359,10 +359,11 @@ def _get_x_and_y_from_args(args, good_args):
     if not isinstance(args[0], (list, np.ndarray, tuple)):
         raise ValueError('x must be an array')
 
-    if good_args == 1:  # Just X specified
+    if good_args == 1:  # Just Y specified
         args[0] = np.array(args[0], dtype=_get_dtype_if_array(args[0]))
         args = args[:1]
         args.append(np.arange(len(args[0]), dtype=_get_dtype_if_array(args[0])))
+        args.reverse()
 
     else:  # X and Y specified
         if not isinstance(args[1], (list, np.ndarray, tuple)):
