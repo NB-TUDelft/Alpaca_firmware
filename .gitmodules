@@ -56,3 +56,6 @@
 [submodule "lib/pico-sdk"]
 	path = lib/pico-sdk
 	url = https://github.com/raspberrypi/pico-sdk.git
+[submodule "lib/ulab"]
+	path = lib/ulab
+	url = https://github.com/v923z/micropython-ulab
