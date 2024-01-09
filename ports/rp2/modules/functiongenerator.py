@@ -257,6 +257,11 @@ class Waveform:
 
         return integers
 
+    def get_voltages(self, n):
+        tt = np.linspace(0, _MAX_NUM - 1, n, dtype=np.uint16)
+        return self.eq(tt) / 1000 # Use waveform equation, get volts
+
+
     @micropython.native
     def __create_wcr_array(self):
         if self.N_step is None:  # Need to calculate N_step
