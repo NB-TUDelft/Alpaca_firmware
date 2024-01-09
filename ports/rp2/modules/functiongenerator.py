@@ -340,7 +340,7 @@ class Triangle(Waveform):
             up[switch_idx:] = 0
 
             down_coef = v_pp / self.array_period / (1 - frac)
-            down = down_coef * tt
+            down = down_coef * tt + self.v_min
             down = down[::-1]
             down[:switch_idx] = 0
 
