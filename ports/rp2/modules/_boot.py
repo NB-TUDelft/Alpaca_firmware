@@ -17,3 +17,5 @@ del os, bdev, vfs
 import ulab
 import sys
 sys.modules['numpy'] = ulab.numpy
+
+del ulab, sys
