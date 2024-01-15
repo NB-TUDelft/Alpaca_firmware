@@ -1,3 +1,5 @@
+# MIT license; Copyright (c) 2024 Thijn Hoekstra
+
 from functiongenerator import DC, _add_instr_to_wcr_array, _setup_spi
 
 
@@ -9,9 +11,9 @@ class DAC:
     def write(self, voltage):
         waveform = DC(voltage)
 
-        wcr_array = _add_instr_to_wcr_array(waveform.get_wcr_array(),
+        wcr_array = _add_instr_to_wcr_array(waveform._get_wcr_array(),
                                             self.dac_A,
-                                            waveform.gain_2)
+                                            waveform._gain_2)
 
         spi, CS, LDAC = _setup_spi()
 

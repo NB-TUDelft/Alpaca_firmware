@@ -1,7 +1,66 @@
+# MIT license; Copyright (c) 2024 Thijn Hoekstra
+
+"""Function generator and means to define waveforms.
+
+This module contains classes that provide function generator functionality to
+the ALPACA. In the Studio Classroom, the `Agilent 33220a`_ Function / Waveform
+Generator is used to this end. This module intends to mimic a subset of the
+functionality of that device using the ALPACA. The desired output is created by
+modulating (stepping) the output of the `MCP 4822`_ Digital-to-Analog Coverter
+(DAC).
+
+To create a waveform, one must first define it. This can be done using a
+number of classes implemented in this module, e.g. `Sine`, `Triangle`, and
+`Square`, for sine, square, and triangular (sawtooth) waves respectively.
+
+Such a waveform, once created, needs to be created using the DAC. To do so,
+this module implements a function generator `FuncGen`. `FuncGen` is intended to
+be used in a `with`-statement, i.e. as a so-called `context manager`_.
+
+Example:
+
+    A typical usage example, in which a sine wave is defined and created using the
+    function generator is shown below. The output of the function generator
+    defaults to the A channel of the DAC::
+
+        >>> from functiongenerator import FuncGen, Sine
+        >>> sine = Sine(Vmin=0, Vmax=1, freq=1)
+        >>> with FuncGen(sine): # Turn on the function generator and create a sine.
+                pass # Do something, e.g. measure while the function generator is on.
+
+    This can be made more consise by creating and directly passing the waveform:
+
+    >>> with FuncGen(Sine(Vmin=1, Vmax=1, freq=1)):
+    >>>     pass
+
+.. _`Agilent 33220a`:
+    https://www.keysight.com/us/en/product/33220A/function--arbitrary-waveform-generator-20-mhz.html
+.. _`MCP 4822`: https://www.microchip.com/en-us/product/mcp4822
+.. _`context manager`: https://peps.python.org/pep-0343/
+"""
+
+
 from ulab import numpy as np
 import _thread
 import utime
 from machine import SPI, Pin
+
+try:
+    const(1)
+except NameError:
+    # This is being run by autodoc. Create some dummy objects
+    def const(n):
+        # """Dummy const"""
+        return n
+
+    def micropython(f):
+        # """Dummy micropython decorator"""
+        pass
+
+    micropython.native = lambda f: f
+
+
+
 
 # Max voltage the DAC is allowed to produce. Set to 3300 mV in
 # to protect against the DAC frying the Pico
@@ -45,7 +104,6 @@ _SET_BYTE_B2 = const(36864)  # MCP4822 setting byte for DAC B, Gain 2
 _FUDGE_FACTOR = const(1)
 
 _VOLTAGE_CALIB_FACTOR = 0.8948
-
 
 # Max voltage array length
 _N_STEP_MAX = const(4096)
@@ -130,48 +188,149 @@ def _as_fraction(number: float, accuracy: float = 0.0001) -> (int, int):
 
 
 class Waveform:
+    """A generic waveform.
+
+    A generic waveform consisting of discrete voltages. Intended to make it
+    convenient to use the function generator or to create sequences of voltages,
+    like sine wave, square waves, or sawtooth waves. Can be initialized
+    based on a set of parameters that fully define the wave.
+
+    For defining the amplitude of the waveform this can for example be a
+    peak-to-peak voltage (`Vpp`) along
+    with an offset voltage (`offset`), a peak-to-mean voltage (`Vp`)
+    along with an offset voltage, or a minimum voltage (`Vmin`) along
+    with a maximum voltage (`Vmax`).
+
+    The time characteristic of the waveform can be defined either as a
+    frequency (`freq`) or as a period (`period`).
+
+    Attributes:
+        v_min (int): An integer expressing the minimum voltage of the waveform
+            in milli-volts.
+        v_max (int): An integer expressing the maximum voltage of the waveform
+            in milli-volts.
+        freq (float): A float indicating the frequency of the wave.
+        unsafe (bool): A boolean indicating whether the waveform is allowed to
+            exceed a maximum voltage of 3.3 volts (the maximum voltage of the
+            analog inputs on the `Raspberry Pi Pico`_ on the ALPACA). Defaults to
+            False.
+        hold (bool): A boolean indicating whether the current voltage of the waveform
+            should be held when used for the function generator. Defaults to
+            False, causing the DAC to shut off.
+
+    Args:
+        Vpp (float): The peak-to-peak voltage of waveform in volts.
+        Vp (float): The peak-to-mean voltage of waveform in volts.
+        Vmin (float): The minimum voltage of the waveform in volts.
+        Vmax (float): The maximum voltage of the waveform in volts.
+        offset (float): The offset voltage of the mean of the waveform in
+            volts.
+        freq (float): The frequency of the waveform in Hertz.
+        period (float): The period of the waveform in seconds.
+        unsafe (bool): A boolean indicating whether the waveform is allowed
+            to exceed a maximum voltage of 3.3 volts (the maximum voltage
+            of the analog inputs on the `Raspberry Pi Pico`_ on the ALPACA).
+            Defaults to False.
+        hold (bool): A boolean indicating whether the current voltage of the
+            waveform should be held when used for the function generator.
+            Defaults to False, causing the DAC to shut off after the
+            function generator stops.
+
+    Raises:
+        ValueError: If no pair of parameters that fully defines the waveform
+            was given.
+
+    Note:
+        By default, the voltage range of the waveform is limited to 0-3.3 V,
+        the range that is safe for input to the analog input pins of the
+        `Raspberry Pi Pico`_ in the ALPACA. Voltages of a waveform that fall
+        outside this range are clipped, i.e. set to either 0 or 3.3 V. This
+        behavior can be turned off using the `unsafe` parameter, increasing
+        the range of the waveform to that of the `MCP 4822`_ DAC, i.e. to
+        0-4.096 V. Note that in both cases, this clipping will occur
+        silently.
+
+    Note:
+        A good example for when to set the `hold` paramater is
+        when using the DAC Assistant on the ALPACA. If the DAC is connected
+        to the DAC Assistant and turned off (0 V) after use, the voltage at
+        the output of the assistant will shoot to a large negative voltage.
+        This might be undesirable for a certain circuit connected to this
+        output. By setting `hold` to True, the DAC will hold the voltage
+        to whatever voltage the function generator happened to end on.
+        Depending on the voltage range of the waveform, this can guarantee
+        a desirable output at the DAC Assistant output.
+
+
+    Examples:
+        A generic waveform with a mean voltage of 1.5 volts, an amplitude
+        of 1.5 volts, and a frequency of 10 Hz and can be created in many
+        ways. Using a mean voltage, an amplitude, and a frequency:
+
+        >>> wf = Waveform(Vp=1.5, offset=1.5, freq=10)
+
+        Using a mean voltage and a peak-to-peak voltage:
+
+        >>> wf = Waveform(Vpp=3, offset=1.5, freq=10)
+
+        Using a minimum and maximum voltage:
+
+        >>> wf = Waveform(Vmin=0, Vmax=3, freq=10)
+
+        Using a period rather than a frequency:
+        >>> wf = Waveform(Vmin=0, Vmax=3, freq=0.1)
+
+    .. _`MCP 4822`: https://www.microchip.com/en-us/product/mcp4822
+    .. _`Raspberry Pi Pico`: https://www.raspberrypi.com/products/raspberry-pi-pico/
+    """
 
     def __init__(self, Vpp=None, Vp=None, Vmin=None, Vmax=None, offset=0,
                  freq=None, period=None, unsafe=False, hold=False):
-        Vmin, Vmax, freq = self.__clean_input(Vpp, Vp, Vmin, Vmax, offset, freq, period,
-                                              unsafe)
+
+        Vmin, Vmax, freq = self._clean_input(Vpp, Vp, Vmin, Vmax, offset,
+                                             freq, period, unsafe)
         self.v_min = Vmin
         self.v_max = Vmax
         self.freq = freq
 
-        self.array_period = _MAX_NUM  # Used to calculate waveforms
+        self._array_period = _MAX_NUM  # Used to calculate waveforms
 
         self.unsafe = unsafe
         self.hold = hold
 
-        self.N_step = None
-        self.gain_2 = False
+        self._N_step = None  # Number of discrete voltages in the waveform.
+        self._gain_2 = False  # Whether 2X gain is needed to create the waveform.
+        self._equation = None # TODO: make this implementation nicer
 
-    def eq(self, tt):
-        pass
+    def _eq(self, tt: np.ndarray) -> np.ndarray:
+        raise NotImplementedError('Error the generic waveform is not intended '
+                                  'for direct use. Please use a subclass.')
 
-    def set_N_step(self, N_step):
-        self.N_step = N_step
+    def _set_N_step(self, n: int) -> None:
+        self._N_step = n
 
     def __str__(self):
         return ('{} with Vmin={} mV, Vmax={} mV, and Frequency={}'
                 .format(type(self).__name__, self.v_min, self.v_max, self.freq))
 
-    def get_wcr_array(self):
-        return self.__create_wcr_array()
+    def _get_wcr_array(self) -> np.ndarray:
+        return self._create_wcr_array()
 
     @staticmethod
-    def __clean_input(V_PP, V_P, V_min, V_max, offset, freq, period, unsafe):
+    def _clean_input(V_PP: float, V_P: float,
+                     V_min: float, V_max: float,
+                     offset: float,
+                     freq: float, period: float, unsafe: bool) -> tuple:
 
         has_vpp_input: bool = (V_PP is not None) or (V_P is not None)
         has_minmax_input: bool = (V_min is not None) and (V_max is not None)
 
         if not (has_vpp_input or has_minmax_input):  # No inputs
-            raise Exception('Expected an keyword argument for waveform size.\n'
-                            'Use either "V_PP" (Peak-to-Peak Voltage) or '
-                            '"V_P" (amplitude).\n'
-                            'Alternatively specify "V_min" and "V_max" ('
-                            'extremes of the waveform).')
+            raise ValueError('Expected an keyword argument for waveform size.\n'
+                             'Use either "V_PP" (Peak-to-Peak Voltage) or '
+                             '"V_P" (amplitude).\n'
+                             'Alternatively specify "V_min" and "V_max" ('
+                             'extremes of the waveform).')
         elif has_vpp_input:
             if V_PP is not None:
                 if _is_number(V_PP, annotation='V_PP'):
@@ -230,7 +389,7 @@ class Waveform:
         return V_min, V_max, freq
 
     @micropython.native
-    def __clip_voltages(self, v_array):
+    def _clip_voltages(self, v_array):
         if self.unsafe:
             v_max = _MAX_VOLTAGE_OVERDRIVE
         else:
@@ -244,8 +403,8 @@ class Waveform:
         return v_array
 
     @micropython.native
-    def __voltage_to_integer(self, voltages):
-        max_voltage = _DAC_MAX_VOLTAGE_GAIN_2 if self.gain_2 else _DAC_MAX_VOLTAGE_GAIN_1
+    def _voltage_to_integer(self, voltages):
+        max_voltage = _DAC_MAX_VOLTAGE_GAIN_2 if self._gain_2 else _DAC_MAX_VOLTAGE_GAIN_1
 
         # print('Gain 2 {}'.format('ON' if self.gain_2 else 'OFF'))
 
@@ -257,14 +416,39 @@ class Waveform:
 
         return integers
 
-    def get_voltages(self, n):
-        tt = np.linspace(0, _MAX_NUM - 1, n, dtype=np.uint16)
-        return self.eq(tt) / 1000 # Use waveform equation, get volts
+    def get_voltages(self, n: int) -> np.ndarray:
+        """Express the waveform as an array of voltages.
 
+        Create an array of N voltages from a waveform. One period of the
+        waveform is sampled to N discrete points equally spaced in time.
+
+        Args:
+            n (int): The number of voltages to which to convert the waveform.
+
+        Returns:
+            np.ndarray: The waveform converted to an array of N voltages.
+
+        Note:
+            The voltages obtained using this method will not undergo the
+            clipping process described in the initilization method of
+            :py:meth:`functiongenerator.Waveform`.
+
+        Examples:
+            Converting a generic waveform into an array using 100 discrete
+            points.
+
+            >>> wf = Waveform(Vp=1.5, offset=1.5, freq=10)
+            >>> a = wf.get_voltages(100)
+            >>> print(len(a))
+            100
+        """
+
+        t = np.linspace(0, _MAX_NUM - 1, int(n), dtype=np.uint16)
+        return self._eq(t) / 1000  # Use waveform equation, get volts
 
     @micropython.native
-    def __create_wcr_array(self):
-        if self.N_step is None:  # Need to calculate N_step
+    def _create_wcr_array(self):
+        if self._N_step is None:  # Need to calculate N_step
             N_step = _get_n_step(self.freq)
 
             if N_step > _N_STEP_MAX:
@@ -275,36 +459,154 @@ class Waveform:
                                  'try a frequency below {} Hz'.format(
                     str(1000000 // _T_DAC_DELAY_US // _N_STEP_MIN)))
 
-            self.set_N_step(N_step)
+            self._set_N_step(N_step)
 
-        tt = np.linspace(0, _MAX_NUM - 1, self.N_step, dtype=np.uint16)
-        voltages = self.eq(tt)  # Use waveform equation
-        voltages = self.__clip_voltages(voltages)
+        tt = np.linspace(0, _MAX_NUM - 1, self._N_step, dtype=np.uint16)
+        voltages = self._eq(tt)  # Use waveform equation
+        voltages = self._clip_voltages(voltages)
 
         if self.v_max >= _DAC_MAX_VOLTAGE_GAIN_1:
-            self.gain_2 = True
+            self._gain_2 = True
         else:
-            self.gain_2 = False
+            self._gain_2 = False
 
-        integers = self.__voltage_to_integer(voltages)
+        integers = self._voltage_to_integer(voltages)
 
         return integers.byteswap().tobytes()
 
 
 class Sine(Waveform):
+    """A sine wave.
+
+    A `sine wave`_ consisting of discrete voltages.
+    Can be initilized using a set of parameters that fully define
+    the wave. For more details, consult the documentation of the super
+    class :py:class:`functiongenerator.Waveform`.
+
+    Attributes:
+        v_min (int): See :py:attr:`functiongenerator.Waveform.v_min`.
+        v_max (int): See :py:attr:`functiongenerator.Waveform.v_max`.
+        freq (float): See :py:attr:`functiongenerator.Waveform.freq`.
+        unsafe (bool): See :py:attr:`functiongenerator.Waveform.unsafe`.
+        hold (bool): See :py:attr:`functiongenerator.Waveform.hold`.
+
+
+    Args:
+        Vpp (float): See :py:class:`functiongenerator.Waveform`.
+        Vp (float): See :py:class:`functiongenerator.Waveform`.
+        Vmin (float): See :py:class:`functiongenerator.Waveform`.
+        Vmax (float): See :py:class:`functiongenerator.Waveform`.
+        offset (float): See :py:class:`functiongenerator.Waveform`.
+        freq (float): See :py:class:`functiongenerator.Waveform`.
+        period (float): See :py:class:`functiongenerator.Waveform`.
+        unsafe (bool): See :py:class:`functiongenerator.Waveform`.
+        hold (bool): See :py:class:`functiongenerator.Waveform`.
+
+    Raises:
+        ValueError: If no pair of parameters that fully defines the sine wave
+            was given.
+
+    Examples:
+        A sine wave with a mean voltage of 1.5 volts, an amplitude
+        of 1.5 volts, and a frequency of 10 Hz and can be created in many
+        ways. Using a mean voltage, an amplitude, and a frequency:
+
+        >>> wf = Sine(Vp=1.5, offset=1.5, freq=10)
+
+        For more information on various ways of defining a waveform, see:
+        :py:class:`functiongenerator.Waveform`.
+
+    .. _`Raspberry Pi Pico`: https://www.raspberrypi.com/products/raspberry-pi-pico/
+    .. _`sine wave`: https://en.wikipedia.org/wiki/Sine_wave
+    """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.N_step = None  # Floating N
-        self.equation = [self.eq]
 
-    def eq(self, tt):
+
+        super().__init__(**kwargs)
+        self._N_step = None  # Floating N
+        self._equation = [self._eq]
+
+    def _eq(self, tt):
         return np.array(0.5 * abs(self.v_max - self.v_min)
-                        * np.sin(2 * np.pi * (tt / self.array_period))
+                        * np.sin(2 * np.pi * (tt / self._array_period))
                         + 0.5 * abs(self.v_max + self.v_min))
 
 
 class Triangle(Waveform):
+    """A triangle wave.
+
+    A `triangle wave`_ consisting of discrete voltages. Can be initialized using
+    a set of parameters that fully define the wave.
+    For more details, consult the documentation of the super
+    class :py:class:`functiongenerator.Waveform`. Can be used to create
+    a symmetric triangle wave, a `sawtooth wave`_ (in both orientations), and
+    other asymetric triangle waves.
+
+    Attributes:
+        v_min (int): See :py:attr:`functiongenerator.Waveform.v_min`.
+        v_max (int): See :py:attr:`functiongenerator.Waveform.v_max`.
+        freq (float): See :py:attr:`functiongenerator.Waveform.freq`.
+        symmetry (float): A floating point number between 0 and 100. The skew
+            of the triangle is determined by the percentile value of symmetry.
+            If set to 50, the triangle is symmetric, i.e. the rise time is
+            exactly equal to the fall time. When set to 100, a rising
+            sawtooth wave is created. Conversely, when set to 0, a falling
+            sawtooth wave is created. Intermediate values result in triangle
+            waves with a difference between the rise and fall times.
+        unsafe (bool): See :py:attr:`functiongenerator.Waveform.unsafe`.
+        hold (bool): See :py:attr:`functiongenerator.Waveform.hold`.
+
+    Args:
+        Vpp (float): See :py:class:`functiongenerator.Waveform`.
+        Vp (float): See :py:class:`functiongenerator.Waveform`.
+        Vmin (float): See :py:class:`functiongenerator.Waveform`.
+        Vmax (float): See :py:class:`functiongenerator.Waveform`.
+        offset (float): See :py:class:`functiongenerator.Waveform`.
+        symmetry (float): A floating point number between 0 and 100. The skew
+            of the triangle is determined by the percentile value of symmetry.
+            If set to 50, the triangle is symmetric, i.e. the rise time is
+            exactly equal to the fall time. When set to 100, a rising
+            sawtooth wave is created. Conversely, when set to 0, a falling
+            sawtooth wave is created. Intermediate values result in triangle
+            waves with a difference between the rise and fall times. Defaults
+            to 50.
+        freq (float): See :py:class:`functiongenerator.Waveform`.
+        period (float): See :py:class:`functiongenerator.Waveform`.
+        unsafe (bool): See :py:class:`functiongenerator.Waveform`.
+        hold (bool): See :py:class:`functiongenerator.Waveform`.
+
+    Raises:
+        ValueError: If no pair of parameters that fully defines the triangle wave
+            was given.
+
+    Examples:
+        A symmetric triangle wave with a mean voltage of 1.5 volts, an amplitude
+        of 1.5 volts, and a frequency of 10 Hz and can be created in many
+        ways. Using a mean voltage, an amplitude, and a frequency:
+
+        >>> wf = Triangle(Vp=1.5, offset=1.5, freq=10)
+
+        A rising sawtooth wave can be created as follows:
+
+        >>> wf = Triangle(Vp=1.5, offset=1.5, symmetry=100, freq=10)
+
+        Likewise, a falling sawtooth wave can be created using:
+
+        >>> wf = Triangle(Vp=1.5, offset=1.5, symmetry=0, freq=10)
+
+        Other values for symmetry between 0 and 100 are also possible:
+
+        >>> wf = Triangle(Vp=1.5, offset=1.5, symmetry=33.3, freq=10)
+
+        For more information on various ways of defining a waveform, see:
+        :py:class:`functiongenerator.Waveform`.
+
+
+    .. _`Raspberry Pi Pico`: https://www.raspberrypi.com/products/raspberry-pi-pico/
+    .. _`triangle wave`: https://en.wikipedia.org/wiki/Triangle_wave
+    .. _`sawtooth wave`: https://en.wikipedia.org/wiki/Sawtooth_wave
+    """
 
     def __init__(self, symmetry=50, **kwargs):
         super().__init__(**kwargs)
@@ -313,10 +615,10 @@ class Triangle(Waveform):
             raise ValueError('Please input a symmetry between 0 and 100%')
 
         self.symmetry = symmetry
-        self.N_step = None  # Floating N
-        self.equation = [self.eq]
+        self._N_step = None  # Floating N
+        self._equation = [self._eq]
 
-    def eq(self, tt):
+    def _eq(self, tt):
 
         frac = self.symmetry / 100
         v_pp = abs(self.v_max - self.v_min)
@@ -336,10 +638,10 @@ class Triangle(Waveform):
         else:
             switch_idx = int(len(tt) * frac)
 
-            up = v_pp * (tt / self.array_period) / frac + self.v_min
+            up = v_pp * (tt / self._array_period) / frac + self.v_min
             up[switch_idx:] = 0
 
-            down_coef = v_pp / self.array_period / (1 - frac)
+            down_coef = v_pp / self._array_period / (1 - frac)
             down = down_coef * tt + self.v_min
             down = down[::-1]
             down[:switch_idx] = 0
@@ -348,8 +650,28 @@ class Triangle(Waveform):
 
 
 class DC(Waveform):
+    """A constant voltage.
 
-    def __init__(self, V=None, hold=False, **kwargs):
+    A waveform consisting of a constant voltage, i.e. a DC voltage
+
+    Attributes:
+        v (int): DC voltage in milli-volts.
+        unsafe (bool): See :py:attr:`functiongenerator.Waveform.unsafe`.
+        hold (bool): See :py:attr:`functiongenerator.Waveform.hold`.
+
+    Args:
+        V (float): Constant voltage in volts.
+        unsafe (bool): See :py:class:`functiongenerator.Waveform`.
+        hold (bool): See :py:class:`functiongenerator.Waveform`.
+
+    Examples:
+        A waveform of a DC current at 1 volt:
+
+        >>> wf = DC(V=1)
+
+    """
+
+    def __init__(self, V=None, hold=False, unsafe=False):
 
         if not isinstance(V, (float, int)):
             raise ValueError(
@@ -358,18 +680,87 @@ class DC(Waveform):
         if V is None:
             raise ValueError('Please input a DC voltage.')
 
-        super().__init__(Vmin=V, Vmax=V, freq=1)
+        super().__init__(Vmin=V, Vmax=V, freq=1, unsafe=unsafe, hold=hold)
 
-        self.V = V * 1000  # Convert to mV
-        self.N_step = 2  # Floating N
-        self.equation = [self.eq]
-        self.hold = hold
+        self.v = V * 1000  # Convert to mV
+        self._N_step = 2  # Floating N
+        self._equation = [self._eq]
 
-    def eq(self, tt):
-        return np.array([self.V] * 2)
+    def _eq(self, tt):
+        return np.array([self.v] * 2)
 
 
 class Square(Waveform):
+    """A square wave.
+
+    A `square wave`_ consisting of discrete voltages. Can be initialized using
+    a set of parameters that fully define the wave.
+    For more details, consult the documentation of the super
+    class :py:class:`functiongenerator.Waveform`. Can be used to create
+    a square wave with a specified `duty cycle`_.
+
+    Attributes:
+       v_min (int): See :py:attr:`functiongenerator.Waveform.v_min`.
+       v_max (int): See :py:attr:`functiongenerator.Waveform.v_max`.
+       freq (float): See :py:attr:`functiongenerator.Waveform.freq`.
+       duty_cycle (float): A floating point number between 0 and 100
+        specifying the fraction of time which the wave is at the maximum
+        voltage.
+       unsafe (bool): See :py:attr:`functiongenerator.Waveform.unsafe`.
+       hold (bool): See :py:attr:`functiongenerator.Waveform.hold`.
+
+    Args:
+       Vpp (float): See :py:class:`functiongenerator.Waveform`.
+       Vp (float): See :py:class:`functiongenerator.Waveform`.
+       Vmin (float): See :py:class:`functiongenerator.Waveform`.
+       Vmax (float): See :py:class:`functiongenerator.Waveform`.
+       offset (float): See :py:class:`functiongenerator.Waveform`.
+       duty_cycle (float): A floating point number between 0 and 100
+        specifying the fraction of time which the wave is at the maximum
+        voltage. Defaults to 50.
+       freq (float): See :py:class:`functiongenerator.Waveform`.
+       period (float): See :py:class:`functiongenerator.Waveform`.
+       unsafe (bool): See :py:class:`functiongenerator.Waveform`.
+       hold (bool): See :py:class:`functiongenerator.Waveform`.
+
+    Raises:
+       ValueError: If no pair of parameters that fully defines the square wave
+           was given.
+
+    Note:
+        If the amplitude of the waveform is irrelevant to the application,
+        also consider using `PWM`_ on a digital pin instead,
+        as this a much faster and more
+        efficient implementation. PWM is however limited to the square wave
+        between 0 and 3.3 V (the output values of the digital pins).
+
+
+
+
+    Todo:
+        * This is a really lazy implementation
+        (i.e. with the ratio of updates to the DAC)
+
+    Examples:
+       A square wave with a mean voltage of 1.5 volts, an amplitude
+       of 1.5 volts, and a frequency of 10 Hz and can be created in many
+       ways. Using a mean voltage, an amplitude, and a frequency:
+
+       >>> wf = Square(Vp=1.5, offset=1.5, freq=10)
+
+       The duty cycle of the square wave can be set from 0 to 100:
+
+       >>> wf = Triangle(Vp=1.5, offset=1.5, duty_cycle=33.3, freq=10)
+
+       For more information on various ways of defining a waveform, see:
+       :py:class:`functiongenerator.Waveform`.
+
+
+    .. _`Raspberry Pi Pico`: https://www.raspberrypi.com/products/raspberry-pi-pico/
+    .. _`square wave`: https://en.wikipedia.org/wiki/Square_wave
+    .. _`duty cycle`: https://en.wikipedia.org/wiki/Duty_cycle
+    .. _`PWM`: https://docs.micropython.org/en/latest/rp2/quickref.html#pwm-pulse-width-modulation
+    """
 
     def __init__(self, duty_cycle: int = 50, **kwargs):
         self.duty_cycle = int(duty_cycle)
@@ -380,18 +771,18 @@ class Square(Waveform):
         super().__init__(**kwargs)
 
         if self.duty_cycle == 100 or self.duty_cycle == 0:
-            self.fraction = None
-            self.N_step = 2  # Fixed N
+            self._fraction = None
+            self._N_step = 2  # Fixed N
         else:
 
-            self.fraction = _as_fraction(self.duty_cycle / 100)
-            self.fraction = (
-                self.fraction[1] - self.fraction[0], self.fraction[0])
-            self.N_step = sum(self.fraction)
+            self._fraction = _as_fraction(self.duty_cycle / 100)
+            self._fraction = (
+                self._fraction[1] - self._fraction[0], self._fraction[0])
+            self._N_step = sum(self._fraction)
 
-        self.equation = [self.eq]
+        self._equation = [self._eq]
 
-    def eq(self, tt):
+    def _eq(self, tt):
         if self.duty_cycle == 100:
             return np.array([self.v_max] * 2)
         elif self.duty_cycle == 0:
@@ -399,24 +790,23 @@ class Square(Waveform):
         else:
 
             return np.array(
-                [self.v_min] * self.fraction[0] + [self.v_max] * self.fraction[
+                [self.v_min] * self._fraction[0] + [self.v_max] * self._fraction[
                     1])
+
 
 class Arbitrary(Waveform):
 
     def __init__(self, voltages, freq: float = None, period: float = None,
                  unsafe=False, hold=False):
-
         super().__init__(Vmax=1, Vmin=0, freq=freq,
                          period=period, unsafe=unsafe, hold=hold)
         self.voltages = voltages
-        self.N_step = len(voltages)  # Floating N
-        self.equation = [self.eq]
+        self._N_step = len(voltages)  # Floating N
+        self._equation = [self._eq]
 
     # Really hacky but let's go with it
-    def eq(self, tt):
-        return np.array(self.voltages) * 1000 # V to mV
-
+    def _eq(self, tt):
+        return np.array(self.voltages) * 1000  # V to mV
 
 
 #######################################################################
@@ -540,20 +930,20 @@ class FuncGen:
         self.waveform = waveform
         self.overdrive = unsafe
 
-        self.wcr_array = self.waveform.get_wcr_array()
+        self.wcr_array = self.waveform._get_wcr_array()
 
         self.dac_A = not channel in ['B', 'b']
 
         self.wcr_array = _add_instr_to_wcr_array(self.wcr_array,
-                                                       self.dac_A,
-                                                       self.waveform.gain_2)
+                                                 self.dac_A,
+                                                 self.waveform._gain_2)
 
     def __enter__(self):
         try:
             _thread.start_new_thread(__function_generator_thread, (
                 self.wcr_array,
                 int(self.waveform.freq * 1000),
-                self.waveform.N_step))
+                self.waveform._N_step))
             # Convert frequency in Hz to mHz
 
         except OSError:
@@ -580,14 +970,13 @@ class FuncGen:
         self.waveform = waveform
 
         self.wcr_array = _add_instr_to_wcr_array(
-            self.waveform.get_wcr_array(),
+            self.waveform._get_wcr_array(),
             self.dac_A,
-            self.waveform.gain_2)
+            self.waveform._gain_2)
 
         # Go again
         stop_flag = False
         self.__enter__()
-
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         """Stop the function generator on the Alpaca.
