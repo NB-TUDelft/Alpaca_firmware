@@ -324,7 +324,7 @@ class Triangle(Waveform):
         if self.symmetry == 0:
             up = 0
 
-            down_coef = v_pp / self._array_period
+            down_coef = v_pp / self._array_period + self.v_min
             down = down_coef * tt
             down = down[::-1]
 
