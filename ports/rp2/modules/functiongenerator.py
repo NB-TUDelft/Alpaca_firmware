@@ -324,12 +324,12 @@ class Triangle(Waveform):
         if self.symmetry == 0:
             up = 0
 
-            down_coef = v_pp / self.array_period / (1 - frac)
+            down_coef = v_pp / self._array_period
             down = down_coef * tt
             down = down[::-1]
 
         elif self.symmetry == 100:
-            up = v_pp * (tt / self.array_period) / frac + self.v_min
+            up = v_pp * (tt / self._array_period) + self.v_min
 
             down = 0
 
