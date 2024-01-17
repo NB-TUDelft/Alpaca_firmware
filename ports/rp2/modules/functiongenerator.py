@@ -21,17 +21,25 @@ Example:
 
     A typical usage example, in which a sine wave is defined and created using the
     function generator is shown below. The output of the function generator
-    defaults to the A channel of the DAC::
+    defaults to the A channel of the DAC. At the same time, the output of the
+    function generator is measured using the analog input pins of the ALPACA::
 
+        >>> import time
+        >>> import machine
         >>> from functiongenerator import FuncGen, Sine
+        >>>
+        >>> a0 = machine.ADC(26)
+        >>>
         >>> sine = Sine(Vmin=0, Vmax=1, freq=1)
         >>> with FuncGen(sine): # Turn on the function generator and create a sine.
-                pass # Do something, e.g. measure while the function generator is on.
+            for i in range(250): # Take 250 samples
+                print("a0: ", a0.read_u16() * 5.0354e-05) # Print result in volts
+                time.sleep(0.01) # Delay such that sampling occurs at 100 Hz
 
     This can be made more consise by creating and directly passing the waveform:
 
     >>> with FuncGen(Sine(Vmin=1, Vmax=1, freq=1)):
-    >>>     pass
+    >>>     pass # Measurement, etc.
 
 .. _`Agilent 33220a`:
     https://www.keysight.com/us/en/product/33220A/function--arbitrary-waveform-generator-20-mhz.html
@@ -433,6 +441,12 @@ class Waveform:
             clipping process described in the initilization method of
             :py:meth:`functiongenerator.Waveform`.
 
+        Note:
+            This function is not defined for the generic
+            :py:meth:`functiongenerator.Waveform` class, but only works for its
+            sub-classes, e.g. :py:meth:`functiongenerator.Sine` and
+            :py:meth:`functiongenerator.Triangle`.
+
         Examples:
             Converting a generic waveform into an array using 100 discrete
             points.
@@ -750,7 +764,7 @@ class Square(Waveform):
 
        The duty cycle of the square wave can be set from 0 to 100:
 
-       >>> wf = Triangle(Vp=1.5, offset=1.5, duty_cycle=33.3, freq=10)
+       >>> wf = Square(Vp=1.5, offset=1.5, duty_cycle=33.3, freq=10)
 
        For more information on various ways of defining a waveform, see:
        :py:class:`functiongenerator.Waveform`.
@@ -762,8 +776,8 @@ class Square(Waveform):
     .. _`PWM`: https://docs.micropython.org/en/latest/rp2/quickref.html#pwm-pulse-width-modulation
     """
 
-    def __init__(self, duty_cycle: int = 50, **kwargs):
-        self.duty_cycle = int(duty_cycle)
+    def __init__(self, duty_cycle: float = 50, **kwargs):
+        self.duty_cycle = float(duty_cycle)
 
         if self.duty_cycle > 100 or self.duty_cycle < 0:
             raise ValueError('Please input a duty cycle between 0 and 100%')
@@ -795,13 +809,65 @@ class Square(Waveform):
 
 
 class Arbitrary(Waveform):
+    """An abritrarily shaped wave.
 
-    def __init__(self, voltages, freq: float = None, period: float = None,
+    An aribitrarily shaped wave consisting of discrete voltages. Initilized
+    using a sequence of voltages to be created at the output of the DAC.
+
+    Attributes:
+       voltages (np.ndarray): An sequence of voltages that make up the waveform.
+       freq (float): See :py:attr:`functiongenerator.Waveform.freq`.
+       unsafe (bool): See :py:attr:`functiongenerator.Waveform.unsafe`.
+       hold (bool): See :py:attr:`functiongenerator.Waveform.hold`.
+
+    Args:
+       voltages (np.ndarray): An sequence of voltages that make up the waveform.
+       freq (float): See :py:class:`functiongenerator.Waveform`.
+       period (float): See :py:class:`functiongenerator.Waveform`.
+       unsafe (bool): See :py:class:`functiongenerator.Waveform`.
+       hold (bool): See :py:class:`functiongenerator.Waveform`.
+
+    Note:
+        Using the function generator,
+        the waveform will be created in the background, i.e. in parallel with
+        whatever code is run inside the `while`. Similar functionality can also
+        be created using
+        :py:meth:`dac.DAC.write`. in a `for` loop. When using
+        the DAC directly this way, this operation happens in series with the
+        other code.
+        This method might be more suitable if some measurement has to be
+        synchronized with the output of the DAC. To conviently get an array to
+        put into :py:meth:`dac.DAC.write`, consider turning a `Waveform` into
+        an array using :py:meth:`functiongenerator.Waveform.get_voltages`.
+
+
+    Examples:
+        A waveform consisting of three voltages stepping up, i.e. from 0
+        to 4 volts (and then back to 0 volts) in steps of 1 volt with a
+        frequency of 100 milli-Hertz.
+
+        >>> steps = [0, 1, 2, 3, 4]
+        >>> wf = Arbitrary(steps, freq=0.1)
+
+        For the arbitrary waveform, it might often make more sense to define
+        the period of the whole wave.
+
+        >>> wf = Arbitrary(steps, period=10)
+
+        This can also be expressed as the delay between two steps:
+        >>> step_delay = 2
+        >>> wf = Arbitrary(steps, period=len(steps) * step_delay)
+
+    .. _`arbitrary waveform generator`: https://en.wikipedia.org/wiki/Arbitrary_waveform_generator
+    """
+
+    def __init__(self, voltages: np.ndarray,
+                 freq: float = None, period: float = None,
                  unsafe=False, hold=False):
         super().__init__(Vmax=1, Vmin=0, freq=freq,
                          period=period, unsafe=unsafe, hold=hold)
         self.voltages = voltages
-        self._N_step = len(voltages)  # Floating N
+        self._N_step = len(voltages)
         self._equation = [self._eq]
 
     # Really hacky but let's go with it
@@ -830,15 +896,15 @@ def _setup_spi():
 
 
 @micropython.native
-def __function_generator_thread(wcr_array: bytearray, freq_mHz: int,
-                                N_steps: int) -> None:
-    global baton
-    global stop_flag
+def _function_generator_thread(wcr_array: bytearray, freq_mHz: int,
+                               N_steps: int) -> None:
+    global _baton
+    global _stop_flag
 
     # Setup
     LED = Pin(25, Pin.OUT)
     LED.value(True)
-    baton.acquire()
+    _baton.acquire()
 
     spi, CS, LDAC = _setup_spi()
 
@@ -860,13 +926,13 @@ def __function_generator_thread(wcr_array: bytearray, freq_mHz: int,
     LDAC.value(False)
 
     buffer = bytearray([0, 0])
-    ii = 0  # Counts points written
-    jj = 0  # Counts periods written
+    i = 0  # Counts points written
+    j = 0  # Counts periods written
     while True:
         # PREPARE ---------------------------
         CS.value(False)
-        buffer[0] = mv[ii]
-        buffer[1] = mv[ii + 1]
+        buffer[0] = mv[i]
+        buffer[1] = mv[i + 1]
 
         # WRITE POINT -----------------------------
         spi.write(buffer)
@@ -874,21 +940,21 @@ def __function_generator_thread(wcr_array: bytearray, freq_mHz: int,
 
         utime.sleep_us(delay_us)
 
-        if ii == target:  # For looping the wave shape
-            ii = 0
-            jj += 1
+        if i == target:  # For looping the wave shape
+            i = 0
+            j += 1
         else:
-            ii += 2
+            i += 2
 
-        if jj == checking_interval:  # For checking whether or not to stop every couple periods
-            if stop_flag:
+        if j == checking_interval:  # For checking whether or not to stop every couple periods
+            if _stop_flag:
                 break
             else:
-                jj = 0
+                j = 0
 
     # print('W-AC')  # Done writing
     LED.value(False)  # Status LED off
-    baton.release()
+    _baton.release()
 
     return
 
@@ -916,32 +982,94 @@ def _add_instr_to_wcr_array(wcr_array, dac_a=True, gain_2=False):
 
 
 class FuncGen:
-    def __init__(self, waveform: Waveform, channel: str = 'A',
-                 unsafe: bool = False):
-        """Construct an instance of the Function Generator class.
+    """A class for a function generator.
+
+    A class that creates a function generator and starts it. Take a waveform as
+    an input and starts a process that takes control of the `MCP 4822`_
+    Digital-to-Analog Coverter (DAC) on the ALPACA. The DAC is continuously
+    updated to approximate the requested waveform. Note that this happens in a
+    thread that is entirely seperate from the main thread, meaning that code
+    in the main thread can be exectued simultaneously. This is advantageous for
+    most measuring setups, where you want to simultaneously create some signal
+    using the function generator, which you then pass through a circuit of some
+    sort, and measure using the analog pins on the ALPACA (the latter being
+    the part run in the main thread). This parallel operation can be handled
+    using `with`-statement, i.e. as a so-called `context manager`_.
+
+    Attributes:
+       waveform (Waveform): The waveform to be created by the function
+        generator.
+       dac_A (bool): A boolean specifying if the DAC A channel is used
+        (rather than DAC B).
+
+    Args:
+        waveform (Waveform): The waveform to be created by the function
+            generator.
+        channel (str): A string specifying which channel to use. For 'a' or
+            'A', channel A on the DAC is used. For 'b' or 'B', channel B is
+            used. Defaults to 'A'.
+
+    Note:
+        Depending on the waveform, the maximum frequency of the function
+        genetator is approximately 800 Hz. For very low frequencies, i.e.
+        <100 milli-Hertz the function
+        generator might also behave erratically.
+
+    Note:
+        :py:meth:`dac.DAC.write` is not indended to be used inside the function
+        generator `with` context. Unexpected behavior may occur.
+
+    Todo:
+        * Fix low-freq function generator behavior.
+
+    Example:
+
+        A typical usage example, in which a sine wave is defined and created using the
+        function generator is shown below. The output of the function generator
+        defaults to the A channel of the DAC::
+
+            >>> from functiongenerator import FuncGen, Sine
+            >>> sine = Sine(Vmin=0, Vmax=1, freq=1)
+            >>> with FuncGen(sine): # Turn on the function generator and create a sine.
+                    pass # Do something, e.g. measure while the function generator is on.
+
+        This can be made more consise by creating and directly passing the waveform::
+
+            >>> with FuncGen(Sine(Vmin=1, Vmax=1, freq=1)):
+                pass
+
+        The function generator defaults to the A-channel of the DAC. The
+        B-channel can also be used instead. Note that it is not yet possible to
+        use both channels simultaneously::
+
+            >>> with FuncGen(Sine(Vmin=1, Vmax=1, freq=1), channel='B'):
+                    pass
+
+    .. _`MCP 4822`: https://www.microchip.com/en-us/product/mcp4822
+    .. _`context manager`: https://peps.python.org/pep-0343/
         """
 
-        global baton
-        global stop_flag
+    def __init__(self, waveform: Waveform, channel: str = 'A'):
+        global _baton
+        global _stop_flag
 
-        baton = _thread.allocate_lock()
-        stop_flag = False
+        _baton = _thread.allocate_lock()
+        _stop_flag = False
 
         self.waveform = waveform
-        self.overdrive = unsafe
 
-        self.wcr_array = self.waveform._get_wcr_array()
+        self._wcr_array = self.waveform._get_wcr_array()
 
         self.dac_A = not channel in ['B', 'b']
 
-        self.wcr_array = _add_instr_to_wcr_array(self.wcr_array,
-                                                 self.dac_A,
-                                                 self.waveform._gain_2)
+        self._wcr_array = _add_instr_to_wcr_array(self._wcr_array,
+                                                  self.dac_A,
+                                                  self.waveform._gain_2)
 
     def __enter__(self):
         try:
-            _thread.start_new_thread(__function_generator_thread, (
-                self.wcr_array,
+            _thread.start_new_thread(_function_generator_thread, (
+                self._wcr_array,
                 int(self.waveform.freq * 1000),
                 self.waveform._N_step))
             # Convert frequency in Hz to mHz
@@ -956,26 +1084,60 @@ class FuncGen:
         return self
 
     def update(self, waveform: Waveform):
+        """
 
+        Args:
+            waveform:
+
+        Examples:
+
+            Change to entirely new waveform::
+
+                >>> import time
+                >>> import machine
+                >>> from functiongenerator import FuncGen, Sine
+                >>>
+                >>> a0 = machine.ADC(26)
+                >>>
+                >>> with FuncGen(Sine(Vpp=2, offset=1, freq=1)) as fg:
+                        for i in range(250):
+                            if not i == 50:
+                                fg.update(Triangle(Vpp=2, offset=1, freq=1))
+
+                            print(a0.read_u16()*5.0354e-05)
+                            time.sleep(0.01)
+
+            Frequency sweep::
+                >>> with FuncGen(Sine(Vpp=2, offset=1, freq=1)) as fg:
+                    freq = 1
+                    for i in range(250):
+                        if not i % 50:
+                            freq += 1
+                            fg.update(Sine(Vpp=2, offset=1, freq=freq))
+
+                        print(a0.read_u16()*5.0354e-05)
+                        time.sleep(0.01)
+
+        """
         # Stop thread
-        global baton
-        global stop_flag
+        global _baton
+        global _stop_flag
 
-        stop_flag = True
+        _stop_flag = True
 
-        baton.acquire()  # Check if the other thread has stopped
-        baton.release()
+        _baton.acquire()  # Check if the other thread has stopped
+        _baton.release()
 
         # Update waveform
         self.waveform = waveform
 
-        self.wcr_array = _add_instr_to_wcr_array(
+        self._wcr_array = _add_instr_to_wcr_array(
             self.waveform._get_wcr_array(),
             self.dac_A,
             self.waveform._gain_2)
 
         # Go again
-        stop_flag = False
+        _stop_flag = False
         self.__enter__()
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
@@ -987,13 +1149,13 @@ class FuncGen:
         --------
         Pico.start_function_generator
         """
-        global baton
-        global stop_flag
+        global _baton
+        global _stop_flag
 
-        stop_flag = True
+        _stop_flag = True
 
-        baton.acquire()  # Check if the other thread has stopped
-        baton.release()
+        _baton.acquire()  # Check if the other thread has stopped
+        _baton.release()
 
         if not self.waveform.hold:
             spi, CS, LDAC = _setup_spi()
@@ -1009,7 +1171,7 @@ class FuncGen:
             spi.write(b'\x01\x00')  # Shudown DAC A
             CS.value(True)
 
-    def __graceful_exit(self):
+    def _graceful_exit(self):
         # """Method to shut down the function generator gracefully. This prevents 'core 1 in use' errors.
         # """
         self.LED.value(False)  # Status LED off
