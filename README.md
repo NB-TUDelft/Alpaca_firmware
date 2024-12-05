@@ -105,6 +105,40 @@ source code into a binary program RP2040’s processors can understand. `build-e
 to build code native to your own machine — this is needed for some internal tools in MicroPython and the SDK. You can
 install all of these via `apt` from the command line. Anything you already have installed will be ignored by `apt`
 
+Linux:
+```shell
+sudo apt update
+sudo apt install cmake gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
+```
+
+Macos
+```shell
+brew update
+brew install cmake
+xcode-select --install
+```
+
+Install `gcc-arm-none-eabi`
+https://developer.arm.com/downloads/-/gnu-rm
+
+Add to PATH
+```shell
+sudo nano /etc/paths
+```
+For example the path could be: /Applications/ARM/bin
+
+The /etc/paths file is a list of paths to search. It should now look something like:
+```
+/usr/local/bin
+/System/Cryptexes/App/usr/bin
+/usr/bin
+/bin
+/usr/sbin
+/sbin
+/Applications/ARM/bin
+```
+
+
 ```bash
 git clone https://github.com/twhoekstra/nb2211-micropython.git
 cd nb2211-micropython/
