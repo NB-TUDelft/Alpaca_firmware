@@ -44,7 +44,7 @@ _SET_BYTE_B2 = const(36864)  # MCP4822 setting byte for DAC B, Gain 2
 # for DAC wave generation. Higher is rougher shapes.
 _FUDGE_FACTOR = const(1)
 
-_VOLTAGE_CALIB_FACTOR = 0.8948
+_VOLTAGE_CALIB_FACTOR = 1
 
 
 # Max voltage array length
