@@ -8,6 +8,10 @@ ROOT_DIR=$(pwd)
 OUT_DIR="$ROOT_DIR/dist"
 mkdir -p "$OUT_DIR"
 
+# Fix Git ownership issues in Docker containers
+echo "==> Configuring Git safe directory"
+git config --global --add safe.directory "$ROOT_DIR" || true
+
 echo "==> Initialising submodules for rp2"
 make -C ports/rp2 submodules
 
@@ -24,8 +28,8 @@ make -C mpy-cross -j"$(nproc)"
 
 echo "==> Building rp2 port (Pico/Pico W)"
 pushd ports/rp2 >/dev/null
-# You can set BOARD=PICO or PICO_W via env var BOARD, default to PICO
-: "${BOARD:=PICO}"
+# You can set BOARD=RPI_PICO or RPI_PICO_W via env var BOARD, default to RPI_PICO
+: "${BOARD:=RPI_PICO}"
 make -j"$(nproc)" BOARD="$BOARD" USER_C_MODULES=../../lib/ulab/code/micropython.cmake
 
 # Try common output locations for UF2
