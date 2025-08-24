@@ -12,7 +12,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-  image: docker.io/zamkorus/alpacafirmwarebuilder:latest
+      image: docker.io/zamkorus/alpacafirmwarebuilder:latest
       # Uncomment if you need to pass additional docker run options
       # options: --user 0:0
     steps:
